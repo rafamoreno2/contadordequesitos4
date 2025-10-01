@@ -5,6 +5,7 @@ import AuthScreen from '@/components/auth-screen';
 import QuesitoForm from '@/components/quesito-form';
 import QuesitoList from '@/components/quesito-list';
 import ContributorsTable from '@/components/contributors-table';
+import ChatWidget from '@/components/chat-widget';
 import { AvatarIcon } from '@/components/avatar-icon';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,12 +15,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { LogOut, Loader2 } from 'lucide-react';
-import type { User, Quesito, Contributor } from '@/types';
+import type { User, Quesito, Contributor, Message } from '@/types';
 import { cn } from '@/lib/utils';
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [quesitos, setQuesitos] = useState<Quesito[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -33,10 +35,15 @@ export default function Home() {
       if (storedQuesitos) {
         setQuesitos(JSON.parse(storedQuesitos));
       }
+      const storedMessages = localStorage.getItem('quesitoMessages');
+      if (storedMessages) {
+        setMessages(JSON.parse(storedMessages));
+      }
     } catch (error) {
       console.error('Failed to parse from localStorage', error);
       localStorage.removeItem('quesitoUser');
       localStorage.removeItem('quesitosList');
+      localStorage.removeItem('quesitoMessages');
     }
   }, []);
 
@@ -55,6 +62,13 @@ export default function Home() {
       localStorage.setItem('quesitosList', JSON.stringify(quesitos));
     }
   }, [quesitos, isMounted]);
+
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem('quesitoMessages', JSON.stringify(messages));
+    }
+  }, [messages, isMounted]);
+
 
   const contributors = useMemo(() => {
     const counts = quesitos.reduce((acc, quesito) => {
@@ -84,6 +98,17 @@ export default function Home() {
     if (!user) return;
     const newQuesito = { id: Date.now(), igUsername, addedBy: user };
     setQuesitos(prevQuesitos => [newQuesito, ...prevQuesitos]);
+  };
+  
+  const handleSendMessage = (text: string) => {
+    if (!user) return;
+    const newMessage: Message = {
+      id: Date.now(),
+      text,
+      user,
+      timestamp: Date.now(),
+    };
+    setMessages(prevMessages => [...prevMessages, newMessage]);
   };
 
   if (!isMounted) {
@@ -152,6 +177,12 @@ export default function Home() {
           </div>
         </div>
       </main>
+
+      <ChatWidget
+        user={user}
+        messages={messages}
+        onSendMessage={handleSendMessage}
+      />
     </div>
   );
 }

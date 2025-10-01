@@ -12,3 +12,10 @@ export type Quesito = {
 export type Contributor = User & {
   count: number;
 };
+
+export type Message = {
+  id: number;
+  text: string;
+  user: User;
+  timestamp: number;
+};
