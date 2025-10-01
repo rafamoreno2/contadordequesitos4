@@ -110,7 +110,7 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
                       htmlFor="custom"
                       onClick={handleUploadClick}
                       className={cn(
-                        'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 p-3 aspect-square transition-all',
+                        'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 p-3 aspect-square transition-all border-dashed',
                          'hover:bg-accent/50 hover:border-accent hover:scale-105',
                         customAvatar ? 'border-primary bg-primary/20 scale-105' : 'border-border'
                       )}
