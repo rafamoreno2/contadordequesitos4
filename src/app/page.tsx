@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LogOut, Loader2 } from 'lucide-react';
 import type { User, Quesito } from '@/types';
-import AlexElCapoAnimation from '@/components/alex-el-capo-animation';
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
@@ -81,14 +80,12 @@ export default function Home() {
     return (
       <>
         <AuthScreen onLogin={handleLogin} />
-        <AlexElCapoAnimation />
       </>
     );
   }
 
   return (
     <div className="min-h-screen bg-background font-body text-foreground">
-      <AlexElCapoAnimation />
       <header className="sticky top-0 z-10 border-b border-border/50 bg-background/80 backdrop-blur-sm">
         <div className="container mx-auto flex h-20 items-center justify-between px-4">
           <div className="flex items-center gap-4">

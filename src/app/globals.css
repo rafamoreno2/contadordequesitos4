@@ -86,18 +86,3 @@ body {
     @apply bg-background text-foreground;
   }
 }
-
-@layer utilities {
-  .animate-walk {
-    animation: walk-across 20s linear infinite;
-  }
-
-  @keyframes walk-across {
-    0% {
-      transform: translateX(100vw);
-    }
-    100% {
-      transform: translateX(-200px);
-    }
-  }
-}
