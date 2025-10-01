@@ -3,6 +3,7 @@
 import { Glasses, FlaskConical, Bug, Braces, Gamepad2, type LucideProps } from 'lucide-react';
 import type { FC } from 'react';
 import Image from 'next/image';
+import { cn } from '@/lib/utils';
 
 export const avatarComponents: { [key: string]: FC<LucideProps> } = {
   glasses: Glasses,
