@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, ChangeEvent } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { avatarComponents, AvatarIcon } from '@/components/avatar-icon';
 import { cn } from '@/lib/utils';
-import { User as UserIcon } from 'lucide-react';
+import { User as UserIcon, Upload } from 'lucide-react';
+import Image from 'next/image';
 
 const availableAvatars = Object.keys(avatarComponents);
 
@@ -19,7 +20,9 @@ type AuthScreenProps = {
 export default function AuthScreen({ onLogin }: AuthScreenProps) {
   const [username, setUsername] = useState('');
   const [avatar, setAvatar] = useState(availableAvatars[0]);
+  const [customAvatar, setCustomAvatar] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +31,25 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
       return;
     }
     setError('');
-    onLogin(username.trim(), avatar);
+    const loginAvatar = customAvatar || avatar;
+    onLogin(username.trim(), loginAvatar);
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        setCustomAvatar(dataUrl);
+        setAvatar('custom');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
   };
 
   return (
@@ -57,7 +78,17 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
             </div>
             <div className="space-y-3">
               <Label>Elige tu avatar</Label>
-              <RadioGroup value={avatar} onValueChange={setAvatar} className="grid grid-cols-5 gap-3" aria-label="Selección de avatar">
+              <RadioGroup 
+                value={customAvatar ? 'custom' : avatar} 
+                onValueChange={(value) => {
+                  if (value !== 'custom') {
+                    setCustomAvatar(null);
+                  }
+                  setAvatar(value);
+                }} 
+                className="grid grid-cols-5 gap-3" 
+                aria-label="Selección de avatar"
+              >
                 {availableAvatars.map((avatarKey) => (
                   <div key={avatarKey}>
                     <RadioGroupItem value={avatarKey} id={avatarKey} className="sr-only" />
@@ -66,13 +97,38 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
                       className={cn(
                         'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 p-3 aspect-square transition-all',
                         'hover:bg-accent/50 hover:border-accent hover:scale-105',
-                        avatar === avatarKey ? 'border-primary bg-primary/20 scale-105' : 'border-border'
+                        avatar === avatarKey && !customAvatar ? 'border-primary bg-primary/20 scale-105' : 'border-border'
                       )}
                     >
                       <AvatarIcon avatar={avatarKey} className="h-10 w-10 text-primary" />
                     </Label>
                   </div>
                 ))}
+                 <div>
+                  <RadioGroupItem value="custom" id="custom" className="sr-only" />
+                    <Label
+                      htmlFor="custom"
+                      onClick={handleUploadClick}
+                      className={cn(
+                        'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 p-3 aspect-square transition-all',
+                         'hover:bg-accent/50 hover:border-accent hover:scale-105',
+                        customAvatar ? 'border-primary bg-primary/20 scale-105' : 'border-border'
+                      )}
+                    >
+                      {customAvatar ? (
+                        <Image src={customAvatar} alt="Custom Avatar" width={40} height={40} className="h-10 w-10 rounded-full object-cover" />
+                      ) : (
+                        <Upload className="h-10 w-10 text-primary" />
+                      )}
+                    </Label>
+                   <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept="image/*"
+                  />
+                </div>
               </RadioGroup>
             </div>
             {error && <p className="text-sm font-medium text-destructive">{error}</p>}

@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LogOut, Loader2 } from 'lucide-react';
 import type { User, Quesito } from '@/types';
+import { cn } from '@/lib/utils';
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
@@ -101,7 +102,13 @@ export default function Home() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex h-12 items-center gap-2 px-2">
                   <div className="bg-primary/20 p-1.5 rounded-full">
-                    <AvatarIcon avatar={user.avatar} className="h-7 w-7 text-primary" />
+                    <AvatarIcon 
+                      avatar={user.avatar} 
+                      className={cn(
+                        'h-7 w-7', 
+                        user.avatar.startsWith('data:image') ? '' : 'text-primary'
+                      )}
+                    />
                   </div>
                   <span className="hidden md:inline font-semibold">{user.username}</span>
                 </Button>

@@ -3,6 +3,7 @@
 import type { Quesito } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { AvatarIcon } from '@/components/avatar-icon';
+import { cn } from '@/lib/utils';
 
 type QuesitoListProps = {
   quesitos: Quesito[];
@@ -32,7 +33,10 @@ export default function QuesitoList({ quesitos }: QuesitoListProps) {
                 <div className="flex items-center gap-2 text-sm text-muted-foreground self-end sm:self-center">
                   <span>Añadido por:</span>
                   <div className="flex items-center gap-1 font-medium bg-secondary text-secondary-foreground rounded-full px-2 py-0.5">
-                    <AvatarIcon avatar={quesito.addedBy.avatar} className="h-4 w-4" />
+                    <AvatarIcon 
+                      avatar={quesito.addedBy.avatar} 
+                      className={cn('h-4 w-4', quesito.addedBy.avatar.startsWith('data:image') ? '' : 'text-secondary-foreground')}
+                    />
                     <span>{quesito.addedBy.username}</span>
                   </div>
                 </div>
