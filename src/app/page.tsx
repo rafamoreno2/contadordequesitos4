@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import AuthScreen from '@/components/auth-screen';
 import QuesitoForm from '@/components/quesito-form';
 import QuesitoList from '@/components/quesito-list';
+import ContributorsTable from '@/components/contributors-table';
 import { AvatarIcon } from '@/components/avatar-icon';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { LogOut, Loader2 } from 'lucide-react';
-import type { User, Quesito } from '@/types';
+import type { User, Quesito, Contributor } from '@/types';
 import { cn } from '@/lib/utils';
 
 export default function Home() {
@@ -54,6 +55,22 @@ export default function Home() {
       localStorage.setItem('quesitosList', JSON.stringify(quesitos));
     }
   }, [quesitos, isMounted]);
+
+  const contributors = useMemo(() => {
+    const counts = quesitos.reduce((acc, quesito) => {
+      const username = quesito.addedBy.username;
+      if (!acc[username]) {
+        acc[username] = { count: 0, user: quesito.addedBy };
+      }
+      acc[username].count++;
+      return acc;
+    }, {} as Record<string, { count: number; user: User }>);
+
+    return Object.values(counts)
+      .map(data => ({ ...data.user, count: data.count } as Contributor))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [quesitos]);
 
   const handleLogin = (username: string, avatar: string) => {
     setUser({ username, avatar });
@@ -125,9 +142,14 @@ export default function Home() {
       </header>
 
       <main className="container mx-auto p-4 md:p-8">
-        <div className="mx-auto max-w-2xl space-y-8">
-          <QuesitoForm onAddQuesito={handleAddQuesito} />
-          <QuesitoList quesitos={quesitos} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-8">
+            <QuesitoForm onAddQuesito={handleAddQuesito} />
+            <QuesitoList quesitos={quesitos} />
+          </div>
+          <div className="space-y-8">
+             <ContributorsTable contributors={contributors} />
+          </div>
         </div>
       </main>
     </div>

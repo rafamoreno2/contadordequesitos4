@@ -8,3 +8,7 @@ export type Quesito = {
   igUsername: string;
   addedBy: User;
 };
+
+export type Contributor = User & {
+  count: number;
+};
