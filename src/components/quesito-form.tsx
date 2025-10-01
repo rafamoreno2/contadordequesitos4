@@ -1,0 +1,50 @@
+'use client';
+
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { PlusCircle, AtSign } from 'lucide-react';
+
+type QuesitoFormProps = {
+  onAddQuesito: (igUsername: string) => void;
+};
+
+export default function QuesitoForm({ onAddQuesito }: QuesitoFormProps) {
+  const [igUsername, setIgUsername] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (igUsername.trim()) {
+      onAddQuesito(igUsername.trim());
+      setIgUsername('');
+    }
+  };
+
+  return (
+    <Card className="overflow-hidden shadow-lg shadow-primary/5">
+      <CardHeader className="bg-muted/30">
+        <CardTitle className="font-headline text-xl text-foreground">Añadir un nuevo Quesito</CardTitle>
+      </CardHeader>
+      <CardContent className="p-4">
+        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="relative flex-grow w-full">
+            <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              placeholder="Usuario de Instagram"
+              value={igUsername}
+              onChange={(e) => setIgUsername(e.target.value)}
+              required
+              className="pl-10"
+              aria-label="Usuario de Instagram"
+            />
+          </div>
+          <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
+            <PlusCircle className="mr-2 h-5 w-5" />
+            Añadir Quesito
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
