@@ -1,14 +1,14 @@
 'use client';
 
-import { Cat, Dog, Bird, Rabbit, Turtle, type LucideProps } from 'lucide-react';
+import { Glasses, FlaskConical, Bug, Braces, Gamepad2, type LucideProps } from 'lucide-react';
 import type { FC } from 'react';
 
 export const avatarComponents: { [key: string]: FC<LucideProps> } = {
-  cat: Cat,
-  dog: Dog,
-  bird: Bird,
-  rabbit: Rabbit,
-  turtle: Turtle,
+  glasses: Glasses,
+  flask: FlaskConical,
+  bug: Bug,
+  braces: Braces,
+  gamepad: Gamepad2,
 };
 
 export const AvatarIcon: FC<{ avatar: string; className?: string }> = ({ avatar, className }) => {
