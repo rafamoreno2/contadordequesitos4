@@ -110,7 +110,7 @@ export default function Home() {
             <h1 className="text-xl sm:text-2xl font-bold text-foreground font-headline tracking-tight">
               Contador de Quesitos
             </h1>
-            <div className="hidden sm:block text-lg font-semibold text-accent-foreground py-2 px-4 rounded-lg bg-accent/30">
+            <div className="text-lg font-semibold text-accent-foreground py-2 px-4 rounded-lg bg-accent/30">
               Total: <span className="font-bold">{quesitos.length}</span>
             </div>
           </div>
