@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { avatarComponents, AvatarIcon } from '@/components/avatar-icon';
 import { cn } from '@/lib/utils';
-import { User as UserIcon, Upload, LogIn } from 'lucide-react';
+import { User as UserIcon, Upload, LogIn, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { useAuth, useFirestore } from '@/firebase';
 import { signInAnonymously } from 'firebase/auth';
