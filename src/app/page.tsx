@@ -39,13 +39,12 @@ export default function Home() {
 
   const [localUser, setLocalUser] = useState<User | null>(null);
 
-  const { data: quesitosData, isLoading: quesitosLoading } = useCollection<Quesito>(
-    useMemoFirebase(() => authUser ? query(collection(firestore, 'quesitos'), orderBy('createdAt', 'desc')) : null, [firestore, authUser])
-  );
-  
-  const { data: messagesData, isLoading: messagesLoading } = useCollection<Message>(
-    useMemoFirebase(() => authUser ? query(collection(firestore, 'messages'), orderBy('timestamp', 'asc')) : null, [firestore, authUser])
-  );
+  const quesitosQuery = useMemoFirebase(() => query(collection(firestore, 'quesitos'), orderBy('createdAt', 'desc')), [firestore]);
+  const messagesQuery = useMemoFirebase(() => query(collection(firestore, 'messages'), orderBy('timestamp', 'asc')), [firestore]);
+
+  const { data: quesitosData, isLoading: quesitosLoading } = useCollection<Quesito>(quesitosQuery);
+  const { data: messagesData, isLoading: messagesLoading } = useCollection<Message>(messagesQuery);
+
 
   const { toast } = useToast();
 
@@ -178,7 +177,7 @@ export default function Home() {
     });
   };
 
-  if (isUserLoading || (authUser && !localUser)) {
+  if (isUserLoading) {
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />

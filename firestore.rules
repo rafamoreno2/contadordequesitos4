@@ -37,15 +37,11 @@ service cloud.firestore {
         return request.auth.uid == userId;
       }
 
-      function isExistingOwner(userId) {
-        return isSignedIn() && resource.data.id == request.auth.uid;
-      }
-
       allow get: if isSignedIn() && isOwner(userId);
       allow list: if false; // Listing users is not permitted.
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == request.auth.uid;
-      allow update: if isSignedIn() && isOwner(userId) && isExistingOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId) && isExistingOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId);
+      allow delete: if isSignedIn() && isOwner(userId);
     }
 
     /**
