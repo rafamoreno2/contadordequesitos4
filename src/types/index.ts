@@ -1,14 +1,12 @@
-import type { User as FirebaseUser } from 'firebase/auth';
-
 export type User = {
-  id: string; // Firebase UID
+  id: string;
   username: string;
   avatar: string;
   quesitosBalance: number;
 };
 
 export type Quesito = {
-  id: string; // Firestore Document ID
+  id: string;
   name: string;
   igUsername: string;
   addedBy: {
@@ -28,7 +26,7 @@ export type Contributor = {
 };
 
 export type Message = {
-  id: string; // Firestore Document ID
+  id: string;
   text: string;
   user: {
     userId: string;
@@ -37,10 +35,3 @@ export type Message = {
   };
   timestamp: number;
 };
-
-// This is the shape of the user profile document in Firestore
-export type UserProfile = {
-  username: string;
-  avatar: string;
-  quesitosBalance: number;
-}

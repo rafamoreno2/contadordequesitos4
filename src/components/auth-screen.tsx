@@ -10,29 +10,22 @@ import { avatarComponents, AvatarIcon } from '@/components/avatar-icon';
 import { cn } from '@/lib/utils';
 import { User as UserIcon, Upload, LogIn, Loader2 } from 'lucide-react';
 import Image from 'next/image';
-import { useAuth, useFirestore } from '@/firebase';
-import { signInAnonymously } from 'firebase/auth';
-import { setDoc, doc } from 'firebase/firestore';
-import { useToast } from '@/hooks/use-toast';
 
 const availableAvatars = Object.keys(avatarComponents);
 
-export default function AuthScreen() {
+type AuthScreenProps = {
+  onLogin: (username: string, avatar: string) => void;
+};
+
+export default function AuthScreen({ onLogin }: AuthScreenProps) {
   const [username, setUsername] = useState('');
   const [avatar, setAvatar] = useState(availableAvatars[0]);
   const [customAvatar, setCustomAvatar] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const auth = useAuth();
-  const firestore = useFirestore();
-  const { toast } = useToast();
 
-  const handleLogin = async () => {
-    if (!auth || !firestore) {
-      setError('Error de inicialización. Inténtalo de nuevo.');
-      return;
-    }
+  const handleLogin = () => {
     if (username.trim().length < 3) {
       setError('El nombre de usuario debe tener al menos 3 caracteres.');
       return;
@@ -40,33 +33,11 @@ export default function AuthScreen() {
     setError('');
     setIsLoading(true);
 
-    try {
-      const userCredential = await signInAnonymously(auth);
-      const user = userCredential.user;
-
-      const loginAvatar = customAvatar || avatar;
-
-      const userProfile = {
-        username: username.trim(),
-        avatar: loginAvatar,
-        quesitosBalance: 0,
-      };
-
-      await setDoc(doc(firestore, "users", user.uid), userProfile);
-      
-      // No need to call onLogin, the onAuthStateChanged listener in Home will handle it
-      
-    } catch (error) {
-      console.error("Error signing in anonymously:", error);
-      setError('No se pudo iniciar sesión. Por favor, inténtalo de nuevo.');
-      toast({
-        variant: "destructive",
-        title: "Error de autenticación",
-        description: "No se pudo crear una sesión de usuario.",
-      });
+    // Simulate a network request
+    setTimeout(() => {
+      onLogin(username.trim(), customAvatar || avatar);
       setIsLoading(false);
-    }
-    // setIsLoading(false) will be handled by the redirect
+    }, 1000);
   };
 
   const handleSubmit = (e: React.FormEvent) => {

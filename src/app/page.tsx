@@ -15,48 +15,64 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { LogOut, Loader2, Database } from 'lucide-react';
-import type { User, UserProfile, Quesito, Contributor, Message } from '@/types';
+import type { User, Quesito, Contributor, Message } from '@/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, useFirestore, useAuth, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, doc, writeBatch, increment } from 'firebase/firestore';
-import { signOut as firebaseSignOut } from 'firebase/auth';
-import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+
+const useLocalStorage = <T,>(key: string, initialValue: T): [T, (value: T) => void] => {
+  const [storedValue, setStoredValue] = useState<T>(() => {
+    if (typeof window === 'undefined') {
+      return initialValue;
+    }
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      console.log(error);
+      return initialValue;
+    }
+  });
+
+  const setValue = (value: T) => {
+    try {
+      const valueToStore = value instanceof Function ? value(storedValue) : value;
+      setStoredValue(valueToStore);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(key, JSON.stringify(valueToStore));
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  return [storedValue, setValue];
+};
 
 
 export default function Home() {
-  const { user: firebaseUser, isUserLoading } = useUser();
-  const firestore = useFirestore();
-  const auth = useAuth();
+  const [user, setUser] = useLocalStorage<User | null>('user', null);
+  const [quesitos, setQuesitos] = useLocalStorage<Quesito[]>('quesitos', []);
+  const [messages, setMessages] = useLocalStorage<Message[]>('messages', []);
+  const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
 
-  const [user, setUser] = useState<User | null>(null);
-
-  const userProfileRef = useMemoFirebase(() => 
-    firestore && firebaseUser ? doc(firestore, 'users', firebaseUser.uid) : null
-  , [firestore, firebaseUser]);
-  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
-
-  const quesitosRef = useMemoFirebase(() => 
-    firestore && firebaseUser ? collection(firestore, 'quesitos') : null
-  , [firestore, firebaseUser]);
-  const { data: quesitos = [] } = useCollection<Quesito>(quesitosRef);
-  
-  const messagesRef = useMemoFirebase(() => 
-    firestore && firebaseUser ? collection(firestore, 'messages') : null
-  , [firestore, firebaseUser]);
-  const { data: messages = [] } = useCollection<Message>(messagesRef);
-
   useEffect(() => {
-    if (firebaseUser && userProfile) {
-      setUser({
-        id: firebaseUser.uid,
-        ...userProfile,
-      });
-    } else {
-      setUser(null);
-    }
-  }, [firebaseUser, userProfile]);
+    setIsClient(true);
+  }, []);
+
+  const handleLogin = (username: string, avatar: string) => {
+    const newUser = {
+      id: `user_${Date.now()}`,
+      username,
+      avatar,
+      quesitosBalance: 0,
+    };
+    setUser(newUser);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+  };
   
   const sortedQuesitos = useMemo(() => {
     return quesitos ? [...quesitos].sort((a, b) => b.createdAt - a.createdAt) : [];
@@ -65,7 +81,7 @@ export default function Home() {
   const sortedMessages = useMemo(() => {
     return messages ? [...messages].sort((a, b) => a.timestamp - b.timestamp) : [];
   }, [messages]);
-  
+
   const contributors = useMemo(() => {
     if (!quesitos) return [];
     const counts: Record<string, { id: string, username: string; avatar: string; count: number; }> = {};
@@ -84,16 +100,11 @@ export default function Home() {
   }, [quesitos]);
 
 
-  const handleLogout = async () => {
-    if (!auth) return;
-    await firebaseSignOut(auth);
-    setUser(null);
-  };
+  const handleAddQuesito = (name: string, igUsername: string) => {
+    if (!user) return;
 
-  const handleAddQuesito = async (name: string, igUsername: string) => {
-    if (!user || !firestore) return;
-    
-    const newQuesito = { 
+    const newQuesito = {
+      id: `quesito_${Date.now()}`,
       name,
       igUsername,
       addedBy: {
@@ -104,32 +115,18 @@ export default function Home() {
       revealedBy: [],
       createdAt: Date.now(),
     };
-
-    const userDocRef = doc(firestore, 'users', user.id);
-    const quesitosColRef = collection(firestore, 'quesitos');
-
-    try {
-      const batch = writeBatch(firestore);
-      batch.set(doc(quesitosColRef), newQuesito);
-      batch.update(userDocRef, { quesitosBalance: increment(1) });
-      await batch.commit();
-
-      toast({
-        title: "¡Quesito añadido!",
-        description: `Has ganado 1 quesito.`,
-      });
-    } catch (error) {
-      console.error("Error adding quesito: ", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudo añadir el quesito.",
-      });
-    }
+    
+    setQuesitos([...quesitos, newQuesito]);
+    setUser({ ...user, quesitosBalance: (user.quesitosBalance || 0) + 1 });
+    
+    toast({
+      title: "¡Quesito añadido!",
+      description: `Has ganado 1 quesito.`,
+    });
   };
 
-  const handleReveal = async (quesitoId: string) => {
-    if (!user || !firestore) return;
+  const handleReveal = (quesitoId: string) => {
+    if (!user) return;
 
     const cost = 5;
     if ((user.quesitosBalance || 0) < cost) {
@@ -141,38 +138,27 @@ export default function Home() {
       return;
     }
     
-    const userDocRef = doc(firestore, 'users', user.id);
-    const quesitoDocRef = doc(firestore, 'quesitos', quesitoId);
-    
-    const currentQuesito = quesitos?.find(q => q.id === quesitoId);
-    if (!currentQuesito) return;
-    const updatedRevealedBy = [...currentQuesito.revealedBy, user.id];
+    const updatedQuesitos = quesitos.map(q => {
+      if (q.id === quesitoId) {
+        return { ...q, revealedBy: [...q.revealedBy, user.id] };
+      }
+      return q;
+    });
 
-    try {
-      const batch = writeBatch(firestore);
-      batch.update(userDocRef, { quesitosBalance: increment(-cost) });
-      batch.update(quesitoDocRef, { revealedBy: updatedRevealedBy });
-      await batch.commit();
+    setQuesitos(updatedQuesitos);
+    setUser({ ...user, quesitosBalance: user.quesitosBalance - cost });
 
-      toast({
-        title: "¡Usuario revelado!",
-        description: `Has gastado ${cost} quesitos.`,
-      });
-    } catch (error) {
-      console.error("Error revealing quesito: ", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudo revelar el usuario.",
-      });
-    }
+    toast({
+      title: "¡Usuario revelado!",
+      description: `Has gastado ${cost} quesitos.`,
+    });
   };
   
   const handleSendMessage = (text: string) => {
-    if (!user || !firestore) return;
-    const messagesColRef = collection(firestore, 'messages');
-    
+    if (!user) return;
+
     const newMessage = {
+      id: `msg_${Date.now()}`,
       text,
       user: {
         userId: user.id,
@@ -181,11 +167,11 @@ export default function Home() {
       },
       timestamp: Date.now(),
     };
-    
-    addDocumentNonBlocking(messagesColRef, newMessage);
+
+    setMessages([...messages, newMessage]);
   };
 
-  if (isUserLoading) {
+  if (!isClient) {
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -194,7 +180,7 @@ export default function Home() {
   }
 
   if (!user) {
-    return <AuthScreen />;
+    return <AuthScreen onLogin={handleLogin} />;
   }
 
   return (
@@ -206,7 +192,7 @@ export default function Home() {
               Contador de Quesitos
             </h1>
             <div className="text-lg font-semibold text-accent-foreground py-2 px-4 rounded-lg bg-accent/30">
-              Total: <span className="font-bold">{quesitos?.length || 0}</span>
+              Total: <span className="font-bold">{quesitos.length}</span>
             </div>
           </div>
           <div className="flex items-center gap-4">
