@@ -8,7 +8,7 @@ export type User = {
 };
 
 export type Quesito = {
-  id: string;
+  id:string;
   name: string;
   igUsername: string;
   addedBy: {
@@ -27,13 +27,14 @@ export type Contributor = {
   count: number;
 };
 
-export type Message = {
-  id: string;
-  text: string;
-  user: {
-    userId: string;
-    username: string;
-    avatar: string;
-  };
-  timestamp: Timestamp;
-};
+// The Message type is no longer needed
+// export type Message = {
+//   id: string;
+//   text: string;
+//   user: {
+//     userId: string;
+//     username: string;
+//     avatar: string;
+//   };
+//   timestamp: Timestamp;
+// };

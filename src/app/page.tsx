@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import QuesitoForm from '@/components/quesito-form';
 import QuesitoList from '@/components/quesito-list';
 import ContributorsTable from '@/components/contributors-table';
-import ChatWidget from '@/components/chat-widget';
 import { AvatarIcon } from '@/components/avatar-icon';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { LogOut, Loader2, Database, User as UserIcon } from 'lucide-react';
-import type { User, Quesito, Contributor, Message } from '@/types';
+import type { User, Quesito, Contributor } from '@/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -40,12 +39,12 @@ export default function Home() {
 
   const [localUser, setLocalUser] = useState<User | null>(null);
 
-  const quesitosQuery = useMemoFirebase(() => query(collection(firestore, 'quesitos'), orderBy('createdAt', 'desc')), [firestore]);
-  const messagesQuery = useMemoFirebase(() => query(collection(firestore, 'messages'), orderBy('timestamp', 'asc')), [firestore]);
+  const quesitosQuery = useMemoFirebase(() => {
+    if (!firestore || !authUser) return null;
+    return query(collection(firestore, 'quesitos'), orderBy('createdAt', 'desc'))
+  }, [firestore, authUser]);
 
   const { data: quesitosData, isLoading: quesitosLoading } = useCollection<Quesito>(quesitosQuery);
-  const { data: messagesData, isLoading: messagesLoading } = useCollection<Message>(messagesQuery);
-
 
   const { toast } = useToast();
 
@@ -175,22 +174,6 @@ export default function Home() {
       });
     })
   };
-  
-  const handleSendMessage = (text: string) => {
-    if (!localUser) return;
-    
-    const messagesColRef = collection(firestore, 'messages');
-
-    addDocumentNonBlocking(messagesColRef, {
-      text,
-      user: {
-        userId: localUser.id,
-        username: localUser.username,
-        avatar: localUser.avatar,
-      },
-      timestamp: serverTimestamp(),
-    });
-  };
 
   if (isUserLoading || !localUser) {
     return (
@@ -263,12 +246,6 @@ export default function Home() {
           </div>
         </div>
       </main>
-
-      <ChatWidget
-        user={localUser}
-        messages={messagesData || []}
-        onSendMessage={handleSendMessage}
-      />
     </div>
   );
 }
