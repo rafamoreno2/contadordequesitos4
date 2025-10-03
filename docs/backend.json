@@ -8,7 +8,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the user."
+          "description": "Unique identifier for the User entity."
         },
         "username": {
           "type": "string",
@@ -16,7 +16,7 @@
         },
         "avatar": {
           "type": "string",
-          "description": "URL of the user's chosen avatar image.",
+          "description": "URL or path to the user's chosen avatar image.",
           "format": "uri"
         }
       },
@@ -30,19 +30,19 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Quesito",
       "type": "object",
-      "description": "Represents a 'quesito' added to the global list.",
+      "description": "Represents a single 'quesito' added to the global list.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the quesito."
-        },
-        "instagramUsername": {
-          "type": "string",
-          "description": "The Instagram username associated with the quesito."
+          "description": "Unique identifier for the Quesito entity."
         },
         "userId": {
           "type": "string",
-          "description": "Reference to the User who added the quesito. (Relationship: User 1:N Quesito)"
+          "description": "Reference to the User who added this quesito. (Relationship: User 1:N Quesito)"
+        },
+        "instagramUsername": {
+          "type": "string",
+          "description": "The Instagram username associated with this quesito."
         },
         "createdAt": {
           "type": "string",
@@ -52,29 +52,9 @@
       },
       "required": [
         "id",
-        "instagramUsername",
         "userId",
+        "instagramUsername",
         "createdAt"
-      ]
-    },
-    "AppMetadata": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "AppMetadata",
-      "type": "object",
-      "description": "Stores app-wide metadata, such as the total number of quesitos.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the app metadata (should be a single, known ID)."
-        },
-        "totalQuesitos": {
-          "type": "number",
-          "description": "The total number of quesitos added to the app."
-        }
-      },
-      "required": [
-        "id",
-        "totalQuesitos"
       ]
     }
   },
@@ -93,31 +73,11 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores user profile information.  This collection is owned by the user.",
+          "description": "Stores user profiles. The userId is used to identify the user.",
           "params": [
             {
               "name": "userId",
               "description": "The unique identifier of the user."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/users/{userId}/quesitos/{quesitoId}",
-        "definition": {
-          "entityName": "Quesito",
-          "schema": {
-            "$ref": "#/backend/entities/Quesito"
-          },
-          "description": "Stores quesitos added by a specific user. Includes denormalized 'userId' for authorization independence.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            },
-            {
-              "name": "quesitoId",
-              "description": "The unique identifier of the quesito."
             }
           ]
         }
@@ -129,7 +89,7 @@
           "schema": {
             "$ref": "#/backend/entities/Quesito"
           },
-          "description": "Stores all quesitos added by all users. Includes 'userId' for authorization.",
+          "description": "Stores all quesitos added by users. Includes denormalized 'userId' for authorization independence.",
           "params": [
             {
               "name": "quesitoId",
@@ -137,24 +97,8 @@
             }
           ]
         }
-      },
-      {
-        "path": "/app_metadata/{appMetadataId}",
-        "definition": {
-          "entityName": "AppMetadata",
-          "schema": {
-            "$ref": "#/backend/entities/AppMetadata"
-          },
-          "description": "Stores app-wide metadata, such as the total number of quesitos.",
-          "params": [
-            {
-              "name": "appMetadataId",
-              "description": "The unique identifier for the app metadata document (e.g., 'global')."
-            }
-          ]
-        }
       }
     ],
-    "reasoning": "This Firestore structure prioritizes security, scalability, and debuggability based on the provided requirements. It adheres to the principles of Authorization Independence, Clarity of Intent, DBAC, and QAPs.\n\n*   **Authorization Independence:** The structure avoids hierarchical authorization dependencies by using path-based ownership for user data and a global collection for quesitos.  The `Quesito` documents store the `userId` enabling rules to be written without needing to `get()` user data.\n*   **Clarity of Intent:** The structure is designed to make authorization intent explicit through clear path naming and data modeling.\n*   **DBAC:**  Authorization relies solely on `request.auth.uid`.\n*   **QAPs:**  The segregation of user-owned data (`/users/{userId}/...`) and global quesitos (`/quesitos`) enables secure `list` operations. Listing quesitos is possible at the global level, and user-specific data is listed within the user's path.\n\nThe structure consists of the following main collections:\n\n*   `/users/{userId}`: Stores user profiles.  This follows the principle of Path-Based ownership.\n*   `/users/{userId}/quesitos/{quesitoId}`: Stores quesitos added by the user.  The `userId` is denormalized into each `quesito` document to ensure authorization independence.\n*   `/quesitos/{quesitoId}`: Stores all quesitos, posted by every user. This design enables a global list of quesitos and a total count of quesitos. `userId` is stored in the document for rule context.\n*   `/app_metadata/{appMetadataId}`: Stores app-wide metadata, such as the total number of quesitos. There will only be one document in this collection (id: 'global').\n\nThis structure allows for secure and efficient queries while maintaining data integrity and scalability."
+    "reasoning": "This design prioritizes security and scalability for the 'Contador de Quesitos' app. It leverages path-based ownership and structural segregation to simplify security rules and ensure data integrity.  \n\n`/users/{userId}`:  Each user has their own document. This collection stores user profiles and enables user-specific data.  The `userId` in the path serves as the unique identifier and links the user to their 'quesitos'.\n\n`/quesitos/{quesitoId}`: Stores all quesitos added by users.  The `userId` is denormalized into each quesito document to ensure authorization independence.  This enables efficient listing of all quesitos. The `userId` field enables filtering quesitos by user if needed.\n\nThis structure achieves Authorization Independence by including the `userId` in the `quesitos` collection, avoiding the need for `get()` calls in security rules to verify ownership. It supports QAPs by allowing secure listing of quesitos and ensures only authenticated users can create them. By using a flat `quesitos` collection and denormalizing the `userId`, listing all quesitos is efficient and doesn't require complex queries. The structure also allows filtering quesitos by `userId` if that functionality is needed."
   }
 }
