@@ -69,9 +69,8 @@ export default function AuthScreen() {
       // This is a "fire and forget" call, but it's crucial to create the user doc
       setDocumentNonBlocking(userDocRef, userData, { merge: true });
       
-      // The useEffect will handle the redirect once displayName is available.
-      // We might need a manual reload to ensure the auth state is updated for the redirect.
-      router.refresh();
+      // Explicitly redirect to home page after successful profile creation
+      router.push('/');
 
     } catch (err: any) {
       console.error("Authentication error:", err);
