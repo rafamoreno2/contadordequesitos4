@@ -37,11 +37,15 @@ service cloud.firestore {
         return request.auth.uid == userId;
       }
 
+      function isExistingOwner(userId) {
+        return isSignedIn() && resource.data.id == request.auth.uid;
+      }
+
       allow get: if isSignedIn() && isOwner(userId);
       allow list: if false; // Listing users is not permitted.
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == request.auth.uid;
+      allow update: if isSignedIn() && isOwner(userId) && isExistingOwner(userId);
+      allow delete: if isSignedIn() && isOwner(userId) && isExistingOwner(userId);
     }
 
     /**
@@ -63,14 +67,14 @@ service cloud.firestore {
         return request.auth.uid == userId;
       }
 
-      function isQuesitoOwner() {
+      function isExistingOwner() {
         return isSignedIn() && resource.data.userId == request.auth.uid;
       }
 
       allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isSignedIn() && isQuesitoOwner();
-      allow delete: if isSignedIn() && isQuesitoOwner();
+      allow update: if isSignedIn() && isExistingOwner();
+      allow delete: if isSignedIn() && isExistingOwner();
     }
 
     /**
