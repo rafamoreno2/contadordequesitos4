@@ -41,7 +41,7 @@ export default function QuesitoList({ quesitos, currentUser, onReveal }: Quesito
                     </div>
                      <div className="text-sm text-muted-foreground mt-1">
                       {isRevealed ? (
-                        <a href={`https://instagram.com/${quesito.igUsername}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        <a href={`https://instagram.com/${quesito.igUsername}`} target="_blank" rel="noopener noreferrer" className="text-accent-foreground font-semibold hover:underline">
                           @{quesito.igUsername}
                         </a>
                       ) : (
