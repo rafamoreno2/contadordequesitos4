@@ -1,151 +1,112 @@
 /**
- * @file Firebase Security Rules for Contador de Quesitos
- *
- * @description This ruleset enforces a user-ownership model for user profiles and quesitos,
- * with a public read for the global quesitos collection.
- *
- * @dataStructure
- * - /users/{userId}: Stores user profiles. Owned by the user.
- * - /users/{userId}/quesitos/{quesitoId}: Stores quesitos added by the user.
- *   Includes denormalized 'userId' for authorization independence.
- * - /quesitos/{quesitoId}: Stores all quesitos, posted by every user.
- *   Includes 'userId' for authorization.
- * - /app_metadata/{appMetadataId}: Stores app-wide metadata, such as the total
- *   number of quesitos.
- *
- * @keySecurityDecisions
- * - Users can only read/write their own profiles.
- * - Users can only read/write quesitos they created in their subcollection.
- * - The global /quesitos collection is publicly readable, but creation, update,
- *   and deletion are restricted to owners (the user who created them).
- * - Listing of user documents is denied.
- * - App metadata is only writable by a privileged backend (not implemented in this prototyping ruleset).
- *
- * @denormalizationForAuthorization
- * - Quesitos in both the user subcollection and the global collection include a
- *   `userId` field. This denormalization enables rules to be written without
- *   needing to `get()` user data, improving performance and security.
- *
- * @structuralSegregation
- * - User-owned data (profiles and quesitos) are stored in user-specific
- *   subcollections (`/users/{userId}/...`), while globally accessible data
- *   (the main quesitos list) is stored in a top-level collection (`/quesitos`).
- *   This enables fine-grained access control and efficient listing.
+ * @file Overview
+ * This ruleset enforces a strict user-ownership model for user profiles and a public-read, owner-write model for the global "quesitos" collection.
+ * Data Structure:
+ * - /users/{userId}: Stores user profile data, accessible only to the owning user.
+ * - /users/{userId}/quesitos/{quesitoId}: Stores quesitos created by a specific user, accessible only to the owning user.
+ * - /quesitos/{quesitoId}: Stores all quesitos. Readable by anyone, but only the creator can modify or delete.
+ * - /app_metadata/{appMetadataId}: Stores app metadata, read and writable by anyone (consider restricting in production).
+ * Key Security Decisions:
+ * - User data is strictly private. No listing of users is allowed.
+ * - The /quesitos collection is publicly readable to facilitate the global list, but writes are restricted to the owner.
+ * - Access to /app_metadata is open.
+ * Denormalization for Authorization:
+ * - The /quesitos collection stores the userId, avoiding costly get() calls to the /users collection for authorization.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Secure root access
-     * @path /
-     * @allow (get) null, empty result set
-     * @deny (create, update, delete, list)
-     * @principle Do not allow root access.
-     */
-    match /{document=**} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    /**
-     * @description Manages user profiles. Users can only read/write their own profiles.
+     * @description Enforces user-ownership for user profiles. Only the user can read or write their own profile.
      * @path /users/{userId}
-     * @allow (create) User with ID matching auth UID can create their profile.
-     * @allow (get) User with ID matching auth UID can read their profile.
-     * @allow (update) User with ID matching auth UID can update their profile.
-     * @allow (delete) User with ID matching auth UID can delete their profile.
-     * @deny (create) User with ID not matching auth UID cannot create a profile.
-     * @deny (get) User with ID not matching auth UID cannot read another user's profile.
-     * @deny (update) User with ID not matching auth UID cannot update another user's profile.
-     * @deny (delete) User with ID not matching auth UID cannot delete another user's profile.
-     * @principle Enforces document ownership for writes.
+     * @allow (create) User with ID 'user123' creates their profile at /users/user123.
+     * @allow (get) User with ID 'user123' reads their profile at /users/user123.
+     * @allow (update) User with ID 'user123' updates their profile at /users/user123.
+     * @allow (delete) User with ID 'user123' deletes their profile at /users/user123.
+     * @deny (create) User with ID 'user123' attempts to create a profile at /users/user456.
+     * @deny (get) User with ID 'user123' attempts to read the profile at /users/user456.
+     * @principle Enforces document ownership for all operations.
      */
     match /users/{userId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
     /**
-     * @description Manages quesitos added by a specific user. Users can only
-     * read/write quesitos they created.
+     * @description Enforces user-ownership for quesitos within a user's subcollection.
      * @path /users/{userId}/quesitos/{quesitoId}
-     * @allow (create) User with ID matching auth UID can create quesito.
-     * @allow (get) User with ID matching auth UID can read their quesito.
-     * @allow (update) User with ID matching auth UID can update their quesito.
-     * @allow (delete) User with ID matching auth UID can delete their quesito.
-     * @deny (create) User with ID not matching auth UID cannot create a quesito.
-     * @deny (get) User with ID not matching auth UID cannot read another user's quesito.
-     * @deny (update) User with ID not matching auth UID cannot update another user's quesito.
-     * @deny (delete) User with ID not matching auth UID cannot delete another user's quesito.
-     * @principle Enforces document ownership for writes within a user subcollection.
+     * @allow (create) User 'user123' creates a quesito with ID 'quesito456' under /users/user123/quesitos/quesito456.
+     * @allow (get) User 'user123' reads quesito 'quesito456' under /users/user123/quesitos/quesito456.
+     * @allow (update) User 'user123' updates quesito 'quesito456' under /users/user123/quesitos/quesito456.
+     * @allow (delete) User 'user123' deletes quesito 'quesito456' under /users/user123/quesitos/quesito456.
+     * @deny (create) User 'user123' attempts to create a quesito under /users/user456/quesitos/quesito456.
+     * @deny (get) User 'user123' attempts to read a quesito under /users/user456/quesitos/quesito456.
+     * @principle Enforces document ownership and prevents unauthorized access.
      */
     match /users/{userId}/quesitos/{quesitoId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
       allow get: if isOwner(userId);
       allow list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
     /**
-     * @description Manages all quesitos added by all users. The global
-     * /quesitos collection is publicly readable, but creation, update, and
-     * deletion are restricted to owners (the user who created them).
+     * @description Allows public read access to quesitos, but restricts write access to the owner of the quesito.
      * @path /quesitos/{quesitoId}
-     * @allow (get, list) Any user can read or list quesitos.
-     * @allow (create) User can create a quesito with their userId.
-     * @allow (update) User can update their quesito, ownership cannot change.
-     * @allow (delete) User can delete their quesito.
-     * @deny (create) User cannot create a quesito with another user's userId.
-     * @deny (update) User cannot update another user's quesito.
-     * @deny (delete) User cannot delete another user's quesito.
-     * @principle Public read, owner-only writes, and enforces document ownership.
+     * @allow (get) Any user can read a quesito with ID 'quesito123' from /quesitos/quesito123.
+     * @allow (list) Any user can list quesitos in the /quesitos collection.
+     * @allow (create) User 'user123' creates a quesito with ID 'quesito456' in /quesitos/quesito456 where request.resource.data.userId == 'user123'.
+     * @allow (update) User 'user123' updates their quesito with ID 'quesito456' in /quesitos/quesito456 where resource.data.userId == 'user123'.
+     * @allow (delete) User 'user123' deletes their quesito with ID 'quesito456' in /quesitos/quesito456 where resource.data.userId == 'user123'.
+     * @deny (create) User 'user13' attempts to create a quesito in /quesitos/quesito456 where request.resource.data.userId != 'user123'.
+     * @deny (update) User 'user123' attempts to update quesito with ID 'quesito456' in /quesitos/quesito456 where resource.data.userId != 'user123'.
+     * @principle Allows public read with owner-only writes, validates ownership on create, update, and delete.
      */
     match /quesitos/{quesitoId} {
-      allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isExistingOwnerByUserId(request.resource.data.userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwnerByUserId(request.resource.data.userId);
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if true;
+      allow list: if true;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update: if isExistingOwner(resource.data.userId);
+      allow delete: if isExistingOwner(resource.data.userId);
     }
 
     /**
-     * @description Manages app-wide metadata, such as the total number of
-     * quesitos. This is intended to be writable only by a privileged backend.
+     * @description Allows anyone to read and write app metadata.  Consider restricting writes in production.
      * @path /app_metadata/{appMetadataId}
-     * @allow (get) Anyone can read app metadata.
-     * @deny (create, update, delete) No one can create, update, or delete app metadata via the client.
-     * @principle Only a trusted backend can modify app metadata.
+     * @allow (get) Any user can read the app metadata.
+     * @allow (list) Any user can list the app metadata.
+     * @allow (create) Any user can create app metadata.
+     * @allow (update) Any user can update app metadata.
+     * @allow (delete) Any user can delete app metadata.
+     * @principle Allows public read and write access.
      */
     match /app_metadata/{appMetadataId} {
       allow get: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-      allow list: if false;
-    }
-
-    // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-    }
-
-    function isExistingOwnerByUserId(userId) {
-      return isSignedIn() && request.auth.uid == userId && resource != null && resource.data.userId == userId;
+      allow list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
   }
 }
