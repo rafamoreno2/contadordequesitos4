@@ -15,143 +15,120 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { LogOut, Loader2, Database } from 'lucide-react';
-import type { User, Quesito, Contributor, Message } from '@/types';
+import type { User, UserProfile, Quesito, Contributor, Message } from '@/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useUser, useFirestore, useAuth, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import { collection, doc, serverTimestamp, writeBatch, increment } from 'firebase/firestore';
+import { signOut as firebaseSignOut } from 'firebase/auth';
+import { addDocumentNonBlocking } from '@/firebase';
+
 
 export default function Home() {
-  const [user, setUser] = useState<User | null>(null);
-  const [quesitos, setQuesitos] = useState<Quesito[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isMounted, setIsMounted] = useState(false);
+  const { user: firebaseUser, isUserLoading } = useUser();
+  const firestore = useFirestore();
+  const auth = useAuth();
   const { toast } = useToast();
 
-  useEffect(() => {
-    setIsMounted(true);
-    try {
-      const storedUser = localStorage.getItem('quesitoUser');
-      if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
-        if (typeof parsedUser.quesitosBalance !== 'number') {
-            parsedUser.quesitosBalance = 0;
-        }
-        setUser(parsedUser);
-      }
-      const storedQuesitos = localStorage.getItem('quesitosList');
-      if (storedQuesitos) {
-        setQuesitos(JSON.parse(storedQuesitos));
-      }
-      const storedMessages = localStorage.getItem('quesitoMessages');
-      if (storedMessages) {
-        setMessages(JSON.parse(storedMessages));
-      }
-    } catch (error) {
-      console.error('Failed to parse from localStorage', error);
-      localStorage.removeItem('quesitoUser');
-      localStorage.removeItem('quesitosList');
-      localStorage.removeItem('quesitoMessages');
-    }
-  }, []);
+  const [user, setUser] = useState<User | null>(null);
+
+  const userProfileRef = useMemoFirebase(() => 
+    firestore && firebaseUser ? doc(firestore, 'users', firebaseUser.uid) : null
+  , [firestore, firebaseUser]);
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+
+  const quesitosRef = useMemoFirebase(() => firestore ? collection(firestore, 'quesitos') : null, [firestore]);
+  const { data: quesitos = [] } = useCollection<Quesito>(quesitosRef);
+  
+  const messagesRef = useMemoFirebase(() => firestore ? collection(firestore, 'messages') : null, [firestore]);
+  const { data: messages = [] } = useCollection<Message>(messagesRef);
 
   useEffect(() => {
-    if (isMounted) {
-      if (user) {
-        localStorage.setItem('quesitoUser', JSON.stringify(user));
-      } else {
-        localStorage.removeItem('quesitoUser');
-      }
+    if (firebaseUser && userProfile) {
+      setUser({
+        id: firebaseUser.uid,
+        ...userProfile,
+      });
+    } else {
+      setUser(null);
     }
-  }, [user, isMounted]);
-
-  useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem('quesitosList', JSON.stringify(quesitos));
-    }
-  }, [quesitos, isMounted]);
-
-  useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem('quesitoMessages', JSON.stringify(messages));
-    }
-  }, [messages, isMounted]);
-
-
-  const contributors = useMemo(() => {
-    const counts = quesitos.reduce((acc, quesito) => {
-      const username = quesito.addedBy.username;
-      if (!acc[username]) {
-        acc[username] = { count: 0, user: quesito.addedBy };
-      }
-      acc[username].count++;
-      return acc;
-    }, {} as Record<string, { count: number; user: User }>);
-
-    return Object.values(counts)
-      .map(data => ({ ...data.user, count: data.count } as Contributor))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+  }, [firebaseUser, userProfile]);
+  
+  const sortedQuesitos = useMemo(() => {
+    return quesitos ? [...quesitos].sort((a, b) => b.createdAt - a.createdAt) : [];
   }, [quesitos]);
 
-  const handleLogin = (username: string, avatar: string) => {
-    // Check if user already exists to preserve balance
-    try {
-      const storedUsers = JSON.parse(localStorage.getItem('quesitoUsers') || '{}');
-      const existingUser = storedUsers[username];
-      if (existingUser) {
-        if (typeof existingUser.quesitosBalance !== 'number') {
-            existingUser.quesitosBalance = 0;
-        }
-        setUser(existingUser);
-      } else {
-        const newUser = { username, avatar, quesitosBalance: 0 };
-        storedUsers[username] = newUser;
-        setUser(newUser);
-        localStorage.setItem('quesitoUsers', JSON.stringify(storedUsers));
+  const sortedMessages = useMemo(() => {
+    return messages ? [...messages].sort((a, b) => a.timestamp - b.timestamp) : [];
+  }, [messages]);
+  
+  const contributors = useMemo(() => {
+    if (!quesitos) return [];
+    const counts: Record<string, { id: string, username: string; avatar: string; count: number; }> = {};
+    
+    quesitos.forEach(quesito => {
+      const { userId, username, avatar } = quesito.addedBy;
+      if (!counts[userId]) {
+        counts[userId] = { id: userId, username, avatar, count: 0 };
       }
-    } catch (error) {
-      const newUser = { username, avatar, quesitosBalance: 0 };
-      const newUsers = {[username]: newUser};
-      setUser(newUser);
-      localStorage.setItem('quesitoUsers', JSON.stringify(newUsers));
-    }
-  };
+      counts[userId].count++;
+    });
 
-  const handleLogout = () => {
-     if(user) {
-        try {
-            const storedUsers = JSON.parse(localStorage.getItem('quesitoUsers') || '{}');
-            storedUsers[user.username] = user;
-            localStorage.setItem('quesitoUsers', JSON.stringify(storedUsers));
-        } catch(e) {
-            console.error("Could not save user data on logout");
-        }
-     }
+    return Object.values(counts)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5) as Contributor[];
+  }, [quesitos]);
+
+
+  const handleLogout = async () => {
+    if (!auth) return;
+    await firebaseSignOut(auth);
     setUser(null);
   };
 
-  const handleAddQuesito = (name: string, igUsername: string) => {
-    if (!user) return;
-    const newQuesito: Quesito = { 
-      id: Date.now(),
+  const handleAddQuesito = async (name: string, igUsername: string) => {
+    if (!user || !firestore) return;
+    
+    const newQuesito = { 
       name,
       igUsername,
-      addedBy: user,
+      addedBy: {
+        userId: user.id,
+        username: user.username,
+        avatar: user.avatar,
+      },
       revealedBy: [],
+      createdAt: Date.now(),
     };
-    setQuesitos(prevQuesitos => [newQuesito, ...prevQuesitos]);
-    const newBalance = (user.quesitosBalance || 0) + 1;
-    setUser(currentUser => currentUser ? { ...currentUser, quesitosBalance: newBalance } : null);
-    toast({
-      title: "¡Quesito añadido!",
-      description: `Has ganado 1 quesito. ¡Ahora tienes ${newBalance}!`,
-    });
+
+    const userDocRef = doc(firestore, 'users', user.id);
+    const quesitosColRef = collection(firestore, 'quesitos');
+
+    try {
+      const batch = writeBatch(firestore);
+      batch.set(doc(quesitosColRef), newQuesito);
+      batch.update(userDocRef, { quesitosBalance: increment(1) });
+      await batch.commit();
+
+      toast({
+        title: "¡Quesito añadido!",
+        description: `Has ganado 1 quesito.`,
+      });
+    } catch (error) {
+      console.error("Error adding quesito: ", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo añadir el quesito.",
+      });
+    }
   };
 
-  const handleReveal = (quesitoId: number) => {
-    if (!user) return;
+  const handleReveal = async (quesitoId: string) => {
+    if (!user || !firestore) return;
 
     const cost = 5;
-    if ((user.quesitosBalance || 0) < cost) {
+    if (user.quesitosBalance < cost) {
       toast({
         variant: "destructive",
         title: "¡No tienes suficientes quesitos!",
@@ -160,30 +137,51 @@ export default function Home() {
       return;
     }
     
-    const newBalance = (user.quesitosBalance || 0) - cost;
-    setUser(currentUser => currentUser ? { ...currentUser, quesitosBalance: newBalance } : null);
-    setQuesitos(prevQuesitos => prevQuesitos.map(q => 
-      q.id === quesitoId ? { ...q, revealedBy: [...q.revealedBy, user.username] } : q
-    ));
+    const userDocRef = doc(firestore, 'users', user.id);
+    const quesitoDocRef = doc(firestore, 'quesitos', quesitoId);
+    
+    const currentQuesito = quesitos?.find(q => q.id === quesitoId);
+    if (!currentQuesito) return;
+    const updatedRevealedBy = [...currentQuesito.revealedBy, user.id];
 
-    toast({
-      title: "¡Usuario revelado!",
-      description: `Has gastado ${cost} quesitos.`,
-    });
+    try {
+      const batch = writeBatch(firestore);
+      batch.update(userDocRef, { quesitosBalance: increment(-cost) });
+      batch.update(quesitoDocRef, { revealedBy: updatedRevealedBy });
+      await batch.commit();
+
+      toast({
+        title: "¡Usuario revelado!",
+        description: `Has gastado ${cost} quesitos.`,
+      });
+    } catch (error) {
+      console.error("Error revealing quesito: ", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo revelar el usuario.",
+      });
+    }
   };
   
   const handleSendMessage = (text: string) => {
-    if (!user) return;
-    const newMessage: Message = {
-      id: Date.now(),
+    if (!user || !firestore) return;
+    const messagesColRef = collection(firestore, 'messages');
+    
+    const newMessage = {
       text,
-      user,
+      user: {
+        userId: user.id,
+        username: user.username,
+        avatar: user.avatar,
+      },
       timestamp: Date.now(),
     };
-    setMessages(prevMessages => [...prevMessages, newMessage]);
+    
+    addDocumentNonBlocking(messagesColRef, newMessage);
   };
 
-  if (!isMounted) {
+  if (isUserLoading) {
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -192,11 +190,7 @@ export default function Home() {
   }
 
   if (!user) {
-    return (
-      <>
-        <AuthScreen onLogin={handleLogin} />
-      </>
-    );
+    return <AuthScreen />;
   }
 
   return (
@@ -208,7 +202,7 @@ export default function Home() {
               Contador de Quesitos
             </h1>
             <div className="text-lg font-semibold text-accent-foreground py-2 px-4 rounded-lg bg-accent/30">
-              Total: <span className="font-bold">{quesitos.length}</span>
+              Total: <span className="font-bold">{quesitos?.length || 0}</span>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -247,7 +241,7 @@ export default function Home() {
           <div className="lg:col-span-2 space-y-8">
             <QuesitoForm onAddQuesito={handleAddQuesito} />
             <QuesitoList 
-              quesitos={quesitos} 
+              quesitos={sortedQuesitos} 
               currentUser={user}
               onReveal={handleReveal}
             />
@@ -260,7 +254,7 @@ export default function Home() {
 
       <ChatWidget
         user={user}
-        messages={messages}
+        messages={sortedMessages}
         onSendMessage={handleSendMessage}
       />
     </div>

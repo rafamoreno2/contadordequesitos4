@@ -10,7 +10,7 @@ import { Eye, Database } from 'lucide-react';
 type QuesitoListProps = {
   quesitos: Quesito[];
   currentUser: User;
-  onReveal: (quesitoId: number) => void;
+  onReveal: (quesitoId: string) => void;
 };
 
 export default function QuesitoList({ quesitos, currentUser, onReveal }: QuesitoListProps) {
@@ -28,8 +28,8 @@ export default function QuesitoList({ quesitos, currentUser, onReveal }: Quesito
       <h2 className="text-2xl font-bold font-headline text-foreground">Lista Global de Quesitos</h2>
       <ul className="space-y-3">
         {quesitos.map((quesito, index) => {
-          const isAddedByCurrentUser = quesito.addedBy.username === currentUser.username;
-          const isRevealed = isAddedByCurrentUser || quesito.revealedBy.includes(currentUser.username);
+          const isAddedByCurrentUser = quesito.addedBy.userId === currentUser.id;
+          const isRevealed = isAddedByCurrentUser || quesito.revealedBy.includes(currentUser.id);
 
           return (
             <li key={quesito.id} className="animate-fade-in-down" style={{ animationFillMode: 'backwards', animationDelay: `${index * 100}ms` }}>

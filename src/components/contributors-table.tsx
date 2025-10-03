@@ -46,7 +46,7 @@ export default function ContributorsTable({ contributors }: ContributorsTablePro
             </TableHeader>
             <TableBody>
               {contributors.map((contributor, index) => (
-                <TableRow key={contributor.username}>
+                <TableRow key={contributor.id}>
                   <TableCell className="font-bold text-center text-lg">
                     {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
                   </TableCell>

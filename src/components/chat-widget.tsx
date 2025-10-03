@@ -75,26 +75,26 @@ export default function ChatWidget({ user, messages, onSendMessage }: ChatWidget
                 key={msg.id}
                 className={cn(
                   'flex items-start gap-2',
-                  msg.user.username === user.username ? 'justify-end' : ''
+                  msg.user.userId === user.id ? 'justify-end' : ''
                 )}
               >
-                {msg.user.username !== user.username && (
+                {msg.user.userId !== user.id && (
                   <AvatarIcon avatar={msg.user.avatar} className="h-6 w-6" />
                 )}
                 <div
                   className={cn(
                     'max-w-[75%] rounded-lg px-3 py-2',
-                    msg.user.username === user.username
+                    msg.user.userId === user.id
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted'
                   )}
                 >
                   <p className="text-sm">{msg.text}</p>
-                   <p className={cn("text-xs mt-1", msg.user.username === user.username ? 'text-primary-foreground/70' : 'text-muted-foreground/70')}>
+                   <p className={cn("text-xs mt-1", msg.user.userId === user.id ? 'text-primary-foreground/70' : 'text-muted-foreground/70')}>
                     {msg.user.username} - {formatDistanceToNow(new Date(msg.timestamp), { addSuffix: true, locale: es })}
                   </p>
                 </div>
-                 {msg.user.username === user.username && (
+                 {msg.user.userId === user.id && (
                   <AvatarIcon avatar={msg.user.avatar} className="h-6 w-6" />
                 )}
               </div>

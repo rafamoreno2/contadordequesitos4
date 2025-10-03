@@ -8,31 +8,70 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { avatarComponents, AvatarIcon } from '@/components/avatar-icon';
 import { cn } from '@/lib/utils';
-import { User as UserIcon, Upload } from 'lucide-react';
+import { User as UserIcon, Upload, LogIn } from 'lucide-react';
 import Image from 'next/image';
+import { useAuth, useFirestore } from '@/firebase';
+import { signInAnonymously } from 'firebase/auth';
+import { setDoc, doc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 const availableAvatars = Object.keys(avatarComponents);
 
-type AuthScreenProps = {
-  onLogin: (username: string, avatar: string) => void;
-};
-
-export default function AuthScreen({ onLogin }: AuthScreenProps) {
+export default function AuthScreen() {
   const [username, setUsername] = useState('');
   const [avatar, setAvatar] = useState(availableAvatars[0]);
   const [customAvatar, setCustomAvatar] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const auth = useAuth();
+  const firestore = useFirestore();
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async () => {
+    if (!auth || !firestore) {
+      setError('Error de inicialización. Inténtalo de nuevo.');
+      return;
+    }
     if (username.trim().length < 3) {
       setError('El nombre de usuario debe tener al menos 3 caracteres.');
       return;
     }
     setError('');
-    const loginAvatar = customAvatar || avatar;
-    onLogin(username.trim(), loginAvatar);
+    setIsLoading(true);
+
+    try {
+      const userCredential = await signInAnonymously(auth);
+      const user = userCredential.user;
+
+      const loginAvatar = customAvatar || avatar;
+
+      const userProfile = {
+        username: username.trim(),
+        avatar: loginAvatar,
+        quesitosBalance: 0,
+      };
+
+      await setDoc(doc(firestore, "users", user.uid), userProfile);
+      
+      // No need to call onLogin, the onAuthStateChanged listener in Home will handle it
+      
+    } catch (error) {
+      console.error("Error signing in anonymously:", error);
+      setError('No se pudo iniciar sesión. Por favor, inténtalo de nuevo.');
+      toast({
+        variant: "destructive",
+        title: "Error de autenticación",
+        description: "No se pudo crear una sesión de usuario.",
+      });
+      setIsLoading(false);
+    }
+    // setIsLoading(false) will be handled by the redirect
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleLogin();
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -73,6 +112,7 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
                   required
                   className="pl-10"
                   aria-label="Nombre de usuario"
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -91,13 +131,14 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
               >
                 {availableAvatars.map((avatarKey) => (
                   <div key={avatarKey}>
-                    <RadioGroupItem value={avatarKey} id={avatarKey} className="sr-only" />
+                    <RadioGroupItem value={avatarKey} id={avatarKey} className="sr-only" disabled={isLoading}/>
                     <Label
                       htmlFor={avatarKey}
                       className={cn(
                         'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 p-3 aspect-square transition-all',
                         'hover:bg-accent/50 hover:border-accent hover:scale-105',
-                        avatar === avatarKey && !customAvatar ? 'border-primary bg-primary/20 scale-105' : 'border-border'
+                        avatar === avatarKey && !customAvatar ? 'border-primary bg-primary/20 scale-105' : 'border-border',
+                        isLoading ? 'opacity-50 cursor-not-allowed' : ''
                       )}
                     >
                       <AvatarIcon avatar={avatarKey} className="h-10 w-10 text-primary" />
@@ -105,14 +146,15 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
                   </div>
                 ))}
                  <div>
-                  <RadioGroupItem value="custom" id="custom" className="sr-only" />
+                  <RadioGroupItem value="custom" id="custom" className="sr-only" disabled={isLoading} />
                     <Label
                       htmlFor="custom"
-                      onClick={handleUploadClick}
+                      onClick={isLoading ? undefined : handleUploadClick}
                       className={cn(
                         'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 p-3 aspect-square transition-all border-dashed',
                          'hover:bg-accent/50 hover:border-accent hover:scale-105',
-                        customAvatar ? 'border-primary bg-primary/20 scale-105' : 'border-border'
+                        customAvatar ? 'border-primary bg-primary/20 scale-105' : 'border-border',
+                         isLoading ? 'opacity-50 cursor-not-allowed' : ''
                       )}
                     >
                       {customAvatar ? (
@@ -127,13 +169,15 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
                     onChange={handleFileChange}
                     className="hidden"
                     accept="image/*"
+                    disabled={isLoading}
                   />
                 </div>
               </RadioGroup>
             </div>
             {error && <p className="text-sm font-medium text-destructive">{error}</p>}
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg font-bold">
-              Entrar
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg font-bold" disabled={isLoading}>
+              {isLoading ? <Loader2 className="animate-spin mr-2" /> : <LogIn className="mr-2" />}
+              {isLoading ? 'Entrando...' : 'Entrar'}
             </Button>
           </form>
         </CardContent>
