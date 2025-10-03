@@ -19,9 +19,9 @@ import type { User, UserProfile, Quesito, Contributor, Message } from '@/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useAuth, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, doc, serverTimestamp, writeBatch, increment } from 'firebase/firestore';
+import { collection, doc, writeBatch, increment } from 'firebase/firestore';
 import { signOut as firebaseSignOut } from 'firebase/auth';
-import { addDocumentNonBlocking } from '@/firebase';
+import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 
 
 export default function Home() {
@@ -37,10 +37,14 @@ export default function Home() {
   , [firestore, firebaseUser]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
-  const quesitosRef = useMemoFirebase(() => firestore ? collection(firestore, 'quesitos') : null, [firestore]);
+  const quesitosRef = useMemoFirebase(() => 
+    firestore && firebaseUser ? collection(firestore, 'quesitos') : null
+  , [firestore, firebaseUser]);
   const { data: quesitos = [] } = useCollection<Quesito>(quesitosRef);
   
-  const messagesRef = useMemoFirebase(() => firestore ? collection(firestore, 'messages') : null, [firestore]);
+  const messagesRef = useMemoFirebase(() => 
+    firestore && firebaseUser ? collection(firestore, 'messages') : null
+  , [firestore, firebaseUser]);
   const { data: messages = [] } = useCollection<Message>(messagesRef);
 
   useEffect(() => {
@@ -128,7 +132,7 @@ export default function Home() {
     if (!user || !firestore) return;
 
     const cost = 5;
-    if (user.quesitosBalance < cost) {
+    if ((user.quesitosBalance || 0) < cost) {
       toast({
         variant: "destructive",
         title: "¡No tienes suficientes quesitos!",
