@@ -31,7 +31,11 @@ export default function Home() {
     try {
       const storedUser = localStorage.getItem('quesitoUser');
       if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        if (typeof parsedUser.quesitosBalance !== 'number') {
+            parsedUser.quesitosBalance = 0;
+        }
+        setUser(parsedUser);
       }
       const storedQuesitos = localStorage.getItem('quesitosList');
       if (storedQuesitos) {
@@ -94,6 +98,9 @@ export default function Home() {
       const storedUsers = JSON.parse(localStorage.getItem('quesitoUsers') || '{}');
       const existingUser = storedUsers[username];
       if (existingUser) {
+        if (typeof existingUser.quesitosBalance !== 'number') {
+            existingUser.quesitosBalance = 0;
+        }
         setUser(existingUser);
       } else {
         const newUser = { username, avatar, quesitosBalance: 0 };
@@ -132,10 +139,11 @@ export default function Home() {
       revealedBy: [],
     };
     setQuesitos(prevQuesitos => [newQuesito, ...prevQuesitos]);
-    setUser(currentUser => currentUser ? { ...currentUser, quesitosBalance: currentUser.quesitosBalance + 1 } : null);
+    const newBalance = (user.quesitosBalance || 0) + 1;
+    setUser(currentUser => currentUser ? { ...currentUser, quesitosBalance: newBalance } : null);
     toast({
       title: "¡Quesito añadido!",
-      description: `Has ganado 1 quesito. ¡Ahora tienes ${user.quesitosBalance + 1}!`,
+      description: `Has ganado 1 quesito. ¡Ahora tienes ${newBalance}!`,
     });
   };
 
@@ -143,7 +151,7 @@ export default function Home() {
     if (!user) return;
 
     const cost = 5;
-    if (user.quesitosBalance < cost) {
+    if ((user.quesitosBalance || 0) < cost) {
       toast({
         variant: "destructive",
         title: "¡No tienes suficientes quesitos!",
@@ -151,8 +159,9 @@ export default function Home() {
       });
       return;
     }
-
-    setUser(currentUser => currentUser ? { ...currentUser, quesitosBalance: currentUser.quesitosBalance - cost } : null);
+    
+    const newBalance = (user.quesitosBalance || 0) - cost;
+    setUser(currentUser => currentUser ? { ...currentUser, quesitosBalance: newBalance } : null);
     setQuesitos(prevQuesitos => prevQuesitos.map(q => 
       q.id === quesitoId ? { ...q, revealedBy: [...q.revealedBy, user.username] } : q
     ));
@@ -205,7 +214,7 @@ export default function Home() {
           <div className="flex items-center gap-4">
              <div className="flex items-center gap-2 text-sm font-semibold text-primary-foreground py-1.5 px-3 rounded-full bg-primary/80">
               <Database className="h-4 w-4" />
-              <span>{user.quesitosBalance}</span>
+              <span>{user.quesitosBalance || 0}</span>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
