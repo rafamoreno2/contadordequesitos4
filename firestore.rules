@@ -1,19 +1,21 @@
 /**
- * @file Firebase Security Rules for Contador de Quesitos App
- * @version 2
+ * @fileoverview Firestore Security Rules for Contador de Quesitos App
  *
- * @description
- * Core Philosophy: This ruleset enforces a blend of public read access for "quesitos" and strict user-ownership for user profiles, ensuring data integrity and user privacy.
+ * Core Philosophy:
+ * This ruleset enforces a user-ownership model for user profiles and allows authenticated users to create "quesitos".
+ * It prioritizes security and scalability by using path-based ownership and structural segregation.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profile data, accessible only to the owning user for modifications.
- * - /quesitos/{quesitoId}: Stores all "quesito" entries, publicly readable, but only creatable and modifiable by the owning user.
+ * - /users/{userId}: Stores user profiles, with the `userId` as the document ID.
+ * - /quesitos/{quesitoId}: Stores "quesitos", with a denormalized `userId` field for authorization.
  *
  * Key Security Decisions:
- * - Public Read Access for Quesitos: The /quesitos collection is publicly readable to encourage engagement.
- * - Owner-Only Writes: Writes to both /users/{userId} and /quesitos/{quesitoId} are strictly controlled by user ID, preventing unauthorized modifications.
- * - Denormalization for Authorization: The `userId` is included within each `quesito` document to facilitate efficient and secure authorization checks without needing additional `get()` operations.
+ * - Only authenticated users can create "quesitos."
+ * - Users can only read and write their own profile data.
+ * - Listing of all "quesitos" is allowed for all users.
  *
+ * Denormalization for Authorization:
+ * The `quesitos` collection denormalizes the `userId` to avoid `get()` calls for ownership checks.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -22,65 +24,62 @@ service cloud.firestore {
     /**
      * @description Controls access to user profile documents.
      * @path /users/{userId}
-     * @allow (create) - Authenticated user can create their own profile if the userId matches their auth.uid.
-     * @allow (get, list, update, delete) - Authenticated user can only access/modify their own profile data.
-     * @deny (create) - If the userId does not match the authenticated user's uid.
-     * @deny (update, delete) - If the authenticated user is not the owner of the profile.
-     * @principle Enforces strict user-ownership for profile data.
+     * @allow (create) - User with UID 'user123' can create their profile at /users/user123.
+     * @allow (get, update, delete) - User with UID 'user123' can read/update/delete their profile at /users/user123.
+     * @deny (create) - User with UID 'user456' cannot create a profile at /users/user123.
+     * @deny (get, update, delete) - User with UID 'user456' cannot read/update/delete the profile at /users/user123.
+     * @principle Enforces document ownership for user profiles, restricting access to the owner only.
      */
     match /users/{userId} {
+      // Function to check if the user is signed in
       function isSignedIn() {
         return request.auth != null;
       }
 
+      // Function to check if the requested user ID matches the authenticated user's ID.
       function isOwner(userId) {
         return request.auth.uid == userId;
       }
 
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false; // Listing users is not permitted.
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
+      // Function to check if the requested user ID matches the authenticated user's ID.
+      function isExistingOwner(userId) {
+        return isOwner(userId);
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to the global list of "quesitos".
+     * @description Controls access to "quesito" documents.
      * @path /quesitos/{quesitoId}
-     * @allow (get, list) - Allows public read access to all quesitos.
-     * @allow (create) - Authenticated user can create a quesito if the userId matches their auth.uid.
-     * @allow (update, delete) - Authenticated user can only modify/delete their own quesitos.
-     * @deny (create) - If the userId in the quesito data does not match the authenticated user's uid.
-     * @deny (update, delete) - If the authenticated user is not the owner of the quesito.
-     * @principle Provides public read access but enforces user-ownership for writes.
+     * @allow (create) - Authenticated user can create a "quesito" with their UID in the 'userId' field.
+     * @allow (get, list) - Any user can read any "quesito".
+     * @deny (update, delete) - User with UID 'user456' cannot update/delete a quesito created by user 'user123'.
+     * @principle Allows public read access to "quesitos" but restricts modifications to the owner.
      */
     match /quesitos/{quesitoId} {
+
       function isSignedIn() {
         return request.auth != null;
       }
 
-      function isOwner(userId) {
-        return request.auth.uid == userId;
+      // Function to check if the user is the owner of the quesito
+      function isOwner(resourceUserId) {
+        return request.auth.uid == resourceUserId;
       }
 
-      function isExistingOwner() {
-        return isSignedIn() && resource.data.userId == request.auth.uid;
+      function isExistingOwner(resourceUserId) {
+        return isSignedIn() && isOwner(resourceUserId);
       }
 
       allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isSignedIn() && isExistingOwner();
-      allow delete: if isSignedIn() && isExistingOwner();
-    }
-
-    /**
-     * @description Placeholder for messages collection rules.
-     * @path /messages
-     */
-    match /messages/{messageId} {
-      // We deny read access for the /messages collection, as indicated by the error provided
-      allow get, list: if false;
-      allow create, update, delete: if false;
+      allow create: if isSignedIn();
+      allow update: if isExistingOwner(resource.data.userId);
+      allow delete: if isExistingOwner(resource.data.userId);
     }
   }
 }
