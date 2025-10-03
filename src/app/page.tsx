@@ -14,15 +14,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, Loader2 } from 'lucide-react';
+import { LogOut, Loader2, Database } from 'lucide-react';
 import type { User, Quesito, Contributor, Message } from '@/types';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [quesitos, setQuesitos] = useState<Quesito[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isMounted, setIsMounted] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     setIsMounted(true);
@@ -87,17 +89,78 @@ export default function Home() {
   }, [quesitos]);
 
   const handleLogin = (username: string, avatar: string) => {
-    setUser({ username, avatar });
+    // Check if user already exists to preserve balance
+    try {
+      const storedUsers = JSON.parse(localStorage.getItem('quesitoUsers') || '{}');
+      const existingUser = storedUsers[username];
+      if (existingUser) {
+        setUser(existingUser);
+      } else {
+        const newUser = { username, avatar, quesitosBalance: 0 };
+        storedUsers[username] = newUser;
+        setUser(newUser);
+        localStorage.setItem('quesitoUsers', JSON.stringify(storedUsers));
+      }
+    } catch (error) {
+      const newUser = { username, avatar, quesitosBalance: 0 };
+      const newUsers = {[username]: newUser};
+      setUser(newUser);
+      localStorage.setItem('quesitoUsers', JSON.stringify(newUsers));
+    }
   };
 
   const handleLogout = () => {
+     if(user) {
+        try {
+            const storedUsers = JSON.parse(localStorage.getItem('quesitoUsers') || '{}');
+            storedUsers[user.username] = user;
+            localStorage.setItem('quesitoUsers', JSON.stringify(storedUsers));
+        } catch(e) {
+            console.error("Could not save user data on logout");
+        }
+     }
     setUser(null);
   };
 
-  const handleAddQuesito = (igUsername: string) => {
+  const handleAddQuesito = (name: string, igUsername: string) => {
     if (!user) return;
-    const newQuesito = { id: Date.now(), igUsername, addedBy: user };
+    const newQuesito: Quesito = { 
+      id: Date.now(),
+      name,
+      igUsername,
+      addedBy: user,
+      revealedBy: [],
+    };
     setQuesitos(prevQuesitos => [newQuesito, ...prevQuesitos]);
+    setUser(currentUser => currentUser ? { ...currentUser, quesitosBalance: currentUser.quesitosBalance + 1 } : null);
+    toast({
+      title: "¡Quesito añadido!",
+      description: `Has ganado 1 quesito. ¡Ahora tienes ${user.quesitosBalance + 1}!`,
+    });
+  };
+
+  const handleReveal = (quesitoId: number) => {
+    if (!user) return;
+
+    const cost = 5;
+    if (user.quesitosBalance < cost) {
+      toast({
+        variant: "destructive",
+        title: "¡No tienes suficientes quesitos!",
+        description: `Necesitas ${cost} quesitos para revelar este usuario.`,
+      });
+      return;
+    }
+
+    setUser(currentUser => currentUser ? { ...currentUser, quesitosBalance: currentUser.quesitosBalance - cost } : null);
+    setQuesitos(prevQuesitos => prevQuesitos.map(q => 
+      q.id === quesitoId ? { ...q, revealedBy: [...q.revealedBy, user.username] } : q
+    ));
+
+    toast({
+      title: "¡Usuario revelado!",
+      description: `Has gastado ${cost} quesitos.`,
+    });
   };
   
   const handleSendMessage = (text: string) => {
@@ -140,6 +203,10 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+             <div className="flex items-center gap-2 text-sm font-semibold text-primary-foreground py-1.5 px-3 rounded-full bg-primary/80">
+              <Database className="h-4 w-4" />
+              <span>{user.quesitosBalance}</span>
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex h-12 items-center gap-2 px-2">
@@ -170,7 +237,11 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
             <QuesitoForm onAddQuesito={handleAddQuesito} />
-            <QuesitoList quesitos={quesitos} />
+            <QuesitoList 
+              quesitos={quesitos} 
+              currentUser={user}
+              onReveal={handleReveal}
+            />
           </div>
           <div className="space-y-8">
              <ContributorsTable contributors={contributors} />
