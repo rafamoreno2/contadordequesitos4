@@ -10,22 +10,21 @@ import { avatarComponents, AvatarIcon } from '@/components/avatar-icon';
 import { cn } from '@/lib/utils';
 import { User as UserIcon, Upload, LogIn, Loader2 } from 'lucide-react';
 import Image from 'next/image';
+import { useAuth } from '@/firebase';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 
 const availableAvatars = Object.keys(avatarComponents);
 
-type AuthScreenProps = {
-  onLogin: (username: string, avatar: string) => void;
-};
-
-export default function AuthScreen({ onLogin }: AuthScreenProps) {
+export default function AuthScreen() {
   const [username, setUsername] = useState('');
   const [avatar, setAvatar] = useState(availableAvatars[0]);
   const [customAvatar, setCustomAvatar] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const auth = useAuth();
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (username.trim().length < 3) {
       setError('El nombre de usuario debe tener al menos 3 caracteres.');
       return;
@@ -33,11 +32,26 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
     setError('');
     setIsLoading(true);
 
-    // Simulate a network request
-    setTimeout(() => {
-      onLogin(username.trim(), customAvatar || avatar);
+    try {
+      // For simplicity, we'll create a new user with a random password each time.
+      // In a real app, you'd have a proper login/signup flow.
+      const email = `${Date.now()}@quesitos.app`;
+      const password = Math.random().toString(36).slice(-8);
+      
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      await updateProfile(user, {
+        displayName: username.trim(),
+        photoURL: customAvatar || avatar,
+      });
+
+    } catch (err: any) {
+      console.error("Authentication error:", err);
+      setError(err.message || "No se pudo iniciar sesión. Inténtalo de nuevo.");
       setIsLoading(false);
-    }, 1000);
+    }
+    // No need to set isLoading to false here, as the component will unmount on successful login
   };
 
   const handleSubmit = (e: React.FormEvent) => {

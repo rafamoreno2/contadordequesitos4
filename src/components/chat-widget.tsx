@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AvatarIcon } from '@/components/avatar-icon';
-import { MessageSquare, Send, X, ChevronsUp, ChevronsDown } from 'lucide-react';
+import { MessageSquare, Send, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Timestamp } from 'firebase/firestore';
 
 
 type ChatWidgetProps = {
@@ -42,6 +43,18 @@ export default function ChatWidget({ user, messages, onSendMessage }: ChatWidget
       setNewMessage('');
     }
   };
+  
+  const formatTimestamp = (timestamp: Timestamp | number) => {
+    if (timestamp instanceof Timestamp) {
+      return formatDistanceToNow(timestamp.toDate(), { addSuffix: true, locale: es });
+    }
+    // Fallback for local data if needed, though we moved to firebase
+    if (typeof timestamp === 'number') {
+      return formatDistanceToNow(new Date(timestamp), { addSuffix: true, locale: es });
+    }
+    return '';
+  };
+
 
   if (!isOpen) {
     return (
@@ -91,7 +104,7 @@ export default function ChatWidget({ user, messages, onSendMessage }: ChatWidget
                 >
                   <p className="text-sm">{msg.text}</p>
                    <p className={cn("text-xs mt-1", msg.user.userId === user.id ? 'text-primary-foreground/70' : 'text-muted-foreground/70')}>
-                    {msg.user.username} - {formatDistanceToNow(new Date(msg.timestamp), { addSuffix: true, locale: es })}
+                    {msg.user.username} - {formatTimestamp(msg.timestamp)}
                   </p>
                 </div>
                  {msg.user.userId === user.id && (

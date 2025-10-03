@@ -1,86 +1,74 @@
 /**
- * @fileOverview Firestore Security Rules for Contador de Quesitos App
+ * @fileoverview Firestore Security Rules for the Contador de Quesitos app.
  *
  * Core Philosophy:
- * This ruleset enforces a user-ownership model for user profiles and allows public read access to "quesitos" while restricting write access to the owner of the quesito.
+ * This ruleset enforces a user-ownership model for user profiles and allows public read access to quesitos, but restricts writes to quesitos to authenticated users and their owners.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profiles, accessible only by the user themselves.
- * - /quesitos/{quesitoId}: Stores quesitos, publicly readable but writable only by the quesito's creator.
+ * - `/users/{userId}`: Stores user profile information, accessible only to the user themselves.
+ * - `/quesitos/{quesitoId}`: Stores quesitos added by users.  Any logged in user can create quesitos. Quesitos are publicly readable.  Only the owner (creator) can update or delete them.
  *
  * Key Security Decisions:
- * - Users can only read/write their own profile data.
- * - Anyone can list and get quesitos.
+ * - Users can only read and write their own profile data.
+ * - Listing users is not allowed.
+ * - Quesitos are publicly readable to encourage discovery and engagement.
  * - Only the creator of a quesito can modify or delete it.
- * - Denormalization: The `quesitos` collection includes a `userId` field to avoid costly `get()` calls when enforcing ownership.
+ *
+ * Denormalization for Authorization:
+ * - The `quesitos` collection denormalizes the `userId` to allow for owner-based access control without additional `get()` calls.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profile documents. Users can only read and write their own profile.
+     * @description Controls access to user profile documents.
      * @path /users/{userId}
-     * @allow (create) User with ID 'user123' creates their own profile.
-     *   request.auth.uid == 'user123' && request.resource.data.id == 'user123'
-     * @allow (get, update, delete) User with ID 'user123' reads/updates/deletes their own profile.
-     *   request.auth.uid == 'user123'
-     * @deny (create) User with ID 'user456' attempts to create profile for 'user123'.
-     *   request.auth.uid == 'user456' && request.resource.data.id == 'user123'
-     * @deny (get, update, delete) User with ID 'user456' attempts to read/update/delete profile for 'user123'.
-     *   request.auth.uid == 'user456'
-     * @principle Enforces document ownership and relational integrity.
+     * @allow (create) - User with UID 'user_abc' can create their own profile document at /users/user_abc.
+     * @allow (get, update, delete) - User with UID 'user_abc' can read, update, and delete their own profile document at /users/user_abc.
+     * @deny (create) - User with UID 'user_abc' cannot create a profile document for another user (e.g., /users/user_xyz).
+     * @deny (update, delete) - User with UID 'user_abc' cannot update or delete another user's profile document (e.g., /users/user_xyz).
+     * @deny (list) - No one can list all user documents.
+     * @principle Enforces document ownership for user profiles; restricts listing for privacy.
      */
     match /users/{userId} {
-      // Allow anyone to get a user document
-      allow get: if true;
-      // Allow the user to list a user documents
-      allow list: if false;
-
-      // Allow a user to create their own document, enforcing that the userId matches the authenticated user's ID.
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == request.auth.uid;
-
-      // Allow a user to update and delete their own document.  The document must exist.
-      allow update, delete: if isSignedIn() && isExistingOwner(userId) && resource.data.id == request.resource.data.id;
-
-
       function isOwner(userId) {
         return request.auth.uid == userId;
       }
-
-       function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+      function isSignedIn() {
+        return request.auth != null;
       }
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isSignedIn() && isOwner(userId) && resource.data.id == userId;
+      allow delete: if isSignedIn() && isOwner(userId) && resource.data.id == userId;
     }
 
     /**
-     * @description Controls access to quesito documents. Allows public reads, but restricts writes to the owner of the quesito.
+     * @description Controls access to quesito documents.  Allows public read, owner-only updates/deletes.
      * @path /quesitos/{quesitoId}
-     * @allow (get, list) Anyone can read quesitos.
-     * @allow (create) User with ID 'user123' creates a quesito with userId 'user123'.
-     *   request.auth.uid == 'user123' && request.resource.data.userId == 'user123'
-     * @allow (update, delete) User with ID 'user123' updates/deletes a quesito they own (userId matches).
-     *   request.auth.uid == 'user123' && resource.data.userId == 'user123'
-     * @deny (create) User with ID 'user456' attempts to create a quesito with userId 'user123'.
-     *   request.auth.uid == 'user456' && request.resource.data.userId == 'user123'
-     * @deny (update, delete) User with ID 'user456' attempts to update/delete a quesito owned by 'user123'.
-     *   request.auth.uid == 'user456' && resource.data.userId == 'user123'
-     * @principle Allows public read access to quesitos while enforcing document ownership for writes.
+     * @allow (get, list) - Any user, even unauthenticated, can read any quesito.
+     * @allow (create) - User with UID 'user_abc' can create a quesito with userId: 'user_abc'.
+     * @deny (update, delete) - User with UID 'user_xyz' cannot update or delete a quesito created by 'user_abc'.
+     * @principle Allows public read access, enforces ownership for writes.
      */
     match /quesitos/{quesitoId} {
-      // Allow anyone to read quesitos
-      allow get, list: if true;
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+      function isSignedIn() {
+        return request.auth != null;
+      }
 
-      // Allow a user to create a quesito, enforcing that the userId matches the authenticated user's ID.
+      allow get: if true;
+      allow list: if true;
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-
-      // Allow a user to update and delete their own quesito. The document must exist.
-      allow update, delete: if isSignedIn() && resource != null && resource.data.userId == request.auth.uid;
-    }
-
-    // Helper function to determine if a user is signed in
-    function isSignedIn() {
-      return request.auth != null;
+      allow update: if isSignedIn() && isExistingOwner(resource.data.userId);
+      allow delete: if isSignedIn() && isExistingOwner(resource.data.userId);
     }
   }
 }

@@ -29,7 +29,7 @@ export default function QuesitoList({ quesitos, currentUser, onReveal }: Quesito
       <ul className="space-y-3">
         {quesitos.map((quesito, index) => {
           const isAddedByCurrentUser = quesito.addedBy.userId === currentUser.id;
-          const isRevealed = isAddedByCurrentUser || quesito.revealedBy.includes(currentUser.id);
+          const isRevealed = isAddedByCurrentUser || (quesito.revealedBy && quesito.revealedBy.includes(currentUser.id));
 
           return (
             <li key={quesito.id} className="animate-fade-in-down" style={{ animationFillMode: 'backwards', animationDelay: `${index * 100}ms` }}>

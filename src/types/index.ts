@@ -1,3 +1,5 @@
+import { Timestamp } from "firebase/firestore";
+
 export type User = {
   id: string;
   username: string;
@@ -15,7 +17,7 @@ export type Quesito = {
     avatar: string;
   };
   revealedBy: string[]; // Array of user IDs that have revealed this quesito
-  createdAt: number;
+  createdAt: Timestamp;
 };
 
 export type Contributor = {
@@ -33,5 +35,5 @@ export type Message = {
     username: string;
     avatar: string;
   };
-  timestamp: number;
+  timestamp: Timestamp;
 };
