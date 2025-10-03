@@ -54,24 +54,21 @@ export default function Home() {
     }
     if (authUser) {
       const userDocRef = doc(firestore, 'users', authUser.uid);
-      const { uid, displayName, photoURL } = authUser;
       
-      const userData: User = {
-        id: uid,
-        username: displayName || 'Usuario Anónimo',
-        avatar: photoURL || 'bug', // Default avatar
-        quesitosBalance: 0,
-      };
-
-      // Create user if it doesn't exist, but don't overwrite existing data like balance
-      setDocumentNonBlocking(userDocRef, userData, { merge: true });
-
-      // For local state, we'll use a snapshot to get the real balance
-      const unsub = onSnapshot(userDocRef, (doc) => {
-        if (doc.exists()) {
-          setLocalUser(doc.data() as User);
+      const unsub = onSnapshot(userDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+           setLocalUser(docSnap.data() as User);
         } else {
-          setLocalUser(userData);
+           // If doc doesn't exist, create it. This can happen on first login.
+           const { uid, displayName, photoURL } = authUser;
+           const userData: User = {
+             id: uid,
+             username: displayName || 'Usuario Anónimo',
+             avatar: photoURL || 'bug',
+             quesitosBalance: 0,
+           };
+           setDocumentNonBlocking(userDocRef, userData, { merge: true });
+           setLocalUser(userData);
         }
       });
       return () => unsub();
@@ -108,7 +105,7 @@ export default function Home() {
 
 
   const handleAddQuesito = (name: string, igUsername: string) => {
-    if (!localUser) return;
+    if (!localUser || !localUser.username || !localUser.avatar) return;
 
     const quesitosColRef = collection(firestore, 'quesitos');
     const userDocRef = doc(firestore, 'users', localUser.id);
@@ -175,7 +172,7 @@ export default function Home() {
     })
   };
 
-  if (isUserLoading || !localUser) {
+  if (isUserLoading || !localUser || !localUser.username || !localUser.avatar) {
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />

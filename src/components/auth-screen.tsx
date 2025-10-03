@@ -11,8 +11,10 @@ import { avatarComponents, AvatarIcon } from '@/components/avatar-icon';
 import { cn } from '@/lib/utils';
 import { User as UserIcon, Upload, LogIn, Loader2 } from 'lucide-react';
 import Image from 'next/image';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore, setDocumentNonBlocking } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { doc } from 'firebase/firestore';
+import type { User } from '@/types';
 
 const availableAvatars = Object.keys(avatarComponents);
 
@@ -24,11 +26,13 @@ export default function AuthScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const auth = useAuth();
+  const firestore = useFirestore();
   const { user: authUser, isUserLoading } = useUser();
   const router = useRouter();
   
   useEffect(() => {
-    if (!isUserLoading && authUser) {
+    // If the user's profile is fully updated, redirect to home.
+    if (!isUserLoading && authUser?.displayName) {
       router.push('/');
     }
   }, [authUser, isUserLoading, router]);
@@ -43,8 +47,6 @@ export default function AuthScreen() {
     setIsLoading(true);
 
     try {
-      // For simplicity, we'll create a new user with a random password each time.
-      // In a real app, you'd have a proper login/signup flow.
       const email = `${Date.now()}@quesitos.app`;
       const password = Math.random().toString(36).slice(-8);
       
@@ -56,7 +58,21 @@ export default function AuthScreen() {
         photoURL: customAvatar || avatar,
       });
 
-      // The useEffect will handle the redirect
+      // After updating profile, create the user document in Firestore
+      const userDocRef = doc(firestore, 'users', user.uid);
+      const userData: User = {
+        id: user.uid,
+        username: user.displayName || username.trim(),
+        avatar: user.photoURL || customAvatar || avatar,
+        quesitosBalance: 0
+      };
+      // This is a "fire and forget" call, but it's crucial to create the user doc
+      setDocumentNonBlocking(userDocRef, userData, { merge: true });
+      
+      // The useEffect will handle the redirect once displayName is available.
+      // We might need a manual reload to ensure the auth state is updated for the redirect.
+      router.refresh();
+
     } catch (err: any) {
       console.error("Authentication error:", err);
       setError(err.message || "No se pudo iniciar sesión. Inténtalo de nuevo.");
@@ -86,7 +102,7 @@ export default function AuthScreen() {
     fileInputRef.current?.click();
   };
 
-  if (isUserLoading || authUser) {
+  if (isUserLoading || authUser?.displayName) {
     return (
        <div className="flex min-h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
