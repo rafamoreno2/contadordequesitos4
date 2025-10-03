@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import AuthScreen from '@/components/auth-screen';
+import { useRouter } from 'next/navigation';
 import QuesitoForm from '@/components/quesito-form';
 import QuesitoList from '@/components/quesito-list';
 import ContributorsTable from '@/components/contributors-table';
@@ -14,7 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, Loader2, Database } from 'lucide-react';
+import { LogOut, Loader2, Database, User as UserIcon } from 'lucide-react';
 import type { User, Quesito, Contributor, Message } from '@/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -36,6 +36,7 @@ export default function Home() {
   const { user: authUser, isUserLoading } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
+  const router = useRouter();
 
   const [localUser, setLocalUser] = useState<User | null>(null);
 
@@ -49,6 +50,9 @@ export default function Home() {
   const { toast } = useToast();
 
   useEffect(() => {
+    if (isUserLoading) {
+      return; // Wait until user state is resolved
+    }
     if (authUser) {
       const userDocRef = doc(firestore, 'users', authUser.uid);
       const { uid, displayName, photoURL } = authUser;
@@ -57,20 +61,33 @@ export default function Home() {
         id: uid,
         username: displayName || 'Usuario Anónimo',
         avatar: photoURL || 'bug', // Default avatar
-        quesitosBalance: localUser?.quesitosBalance ?? 0, // Preserve balance if available
+        quesitosBalance: 0,
       };
 
-      // Check if user exists, if not, create it
+      // Create user if it doesn't exist, but don't overwrite existing data like balance
       setDocumentNonBlocking(userDocRef, userData, { merge: true });
-      setLocalUser(userData);
 
-    } else if (!isUserLoading) {
-      setLocalUser(null);
+      // For local state, we'll use a snapshot to get the real balance
+      const unsub = onSnapshot(userDocRef, (doc) => {
+        if (doc.exists()) {
+          setLocalUser(doc.data() as User);
+        } else {
+          setLocalUser(userData);
+        }
+      });
+      return () => unsub();
+
+    } else {
+      router.push('/login');
     }
-  }, [authUser, isUserLoading, firestore, localUser?.quesitosBalance]);
+  }, [authUser, isUserLoading, firestore, router]);
   
-  const handleLogout = () => {
-    signOut(auth);
+  const handleLogout = (redirect = true) => {
+    signOut(auth).then(() => {
+      if (redirect) {
+        router.push('/login');
+      }
+    });
   };
   
   const contributors = useMemo(() => {
@@ -111,7 +128,6 @@ export default function Home() {
     });
 
     updateDocumentNonBlocking(userDocRef, { quesitosBalance: newBalance });
-    setLocalUser({ ...localUser, quesitosBalance: newBalance });
     
     toast({
       title: "¡Quesito añadido!",
@@ -146,7 +162,6 @@ export default function Home() {
     batch.update(userDocRef, { quesitosBalance: newBalance });
 
     batch.commit().then(() => {
-       setLocalUser({ ...localUser, quesitosBalance: newBalance });
        toast({
         title: "¡Usuario revelado!",
         description: `Has gastado ${cost} quesitos.`,
@@ -177,7 +192,7 @@ export default function Home() {
     });
   };
 
-  if (isUserLoading) {
+  if (isUserLoading || !localUser) {
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -185,9 +200,6 @@ export default function Home() {
     );
   }
 
-  if (!localUser) {
-    return <AuthScreen />;
-  }
 
   return (
     <div className="min-h-screen bg-background font-body text-foreground">
@@ -222,7 +234,11 @@ export default function Home() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                <DropdownMenuItem onClick={() => handleLogout(true)} className="cursor-pointer">
+                  <UserIcon className="mr-2 h-4 w-4" />
+                  <span>Cambiar Usuario</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleLogout(false)} className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Cerrar sesión</span>
                 </DropdownMenuItem>

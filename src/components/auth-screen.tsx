@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, ChangeEvent } from 'react';
+import { useState, useRef, ChangeEvent, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,7 @@ import { avatarComponents, AvatarIcon } from '@/components/avatar-icon';
 import { cn } from '@/lib/utils';
 import { User as UserIcon, Upload, LogIn, Loader2 } from 'lucide-react';
 import Image from 'next/image';
-import { useAuth } from '@/firebase';
+import { useAuth, useUser } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 
 const availableAvatars = Object.keys(avatarComponents);
@@ -23,6 +24,15 @@ export default function AuthScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const auth = useAuth();
+  const { user: authUser, isUserLoading } = useUser();
+  const router = useRouter();
+  
+  useEffect(() => {
+    if (!isUserLoading && authUser) {
+      router.push('/');
+    }
+  }, [authUser, isUserLoading, router]);
+
 
   const handleLogin = async () => {
     if (username.trim().length < 3) {
@@ -46,12 +56,12 @@ export default function AuthScreen() {
         photoURL: customAvatar || avatar,
       });
 
+      // The useEffect will handle the redirect
     } catch (err: any) {
       console.error("Authentication error:", err);
       setError(err.message || "No se pudo iniciar sesión. Inténtalo de nuevo.");
       setIsLoading(false);
     }
-    // No need to set isLoading to false here, as the component will unmount on successful login
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -75,6 +85,14 @@ export default function AuthScreen() {
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
+
+  if (isUserLoading || authUser) {
+    return (
+       <div className="flex min-h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    )
+  }
 
   return (
     <main className="flex min-h-screen w-full flex-col items-center justify-center bg-background p-4">
