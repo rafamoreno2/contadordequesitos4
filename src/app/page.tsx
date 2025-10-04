@@ -31,7 +31,7 @@ import {
 import { collection, doc, serverTimestamp, query, orderBy, writeBatch, onSnapshot } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 
-const QuesitosMap = dynamic(() => import('@/components/quesitos-map'), {
+const MapWrapper = dynamic(() => import('@/components/map-wrapper'), {
   ssr: false,
   loading: () => <div className="h-96 w-full bg-muted rounded-lg flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
 });
@@ -101,11 +101,14 @@ export default function Home() {
     const counts: Record<string, { id: string, username: string; avatar: string; count: number; }> = {};
     
     quesitosData.forEach(quesito => {
-      const { userId, username, avatar } = quesito.addedBy;
-      if (!counts[userId]) {
-        counts[userId] = { id: userId, username, avatar, count: 0 };
+      // Ensure addedBy and its properties exist before destructuring
+      if (quesito.addedBy && quesito.addedBy.userId && quesito.addedBy.username && quesito.addedBy.avatar) {
+        const { userId, username, avatar } = quesito.addedBy;
+        if (!counts[userId]) {
+          counts[userId] = { id: userId, username, avatar, count: 0 };
+        }
+        counts[userId].count++;
       }
-      counts[userId].count++;
     });
 
     return Object.values(counts)
@@ -251,7 +254,7 @@ export default function Home() {
           </div>
           <div className="space-y-8">
              <ContributorsTable contributors={contributors} />
-             <QuesitosMap quesitos={quesitosData || []} />
+             <MapWrapper quesitos={quesitosData || []} />
           </div>
         </div>
       </main>
