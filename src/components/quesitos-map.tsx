@@ -29,6 +29,9 @@ type QuesitosMapProps = {
 // Dummy "geocoding" - VERY basic, just to get some coordinates.
 // In a real app, you'd use a proper geocoding service.
 const geocodeLocation = (locationName: string): [number, number] | null => {
+    if (!locationName || typeof locationName !== 'string') {
+        return null;
+    }
     const hash = locationName.split('').reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
     const lat = (hash % 180) - 90 + Math.random() * 0.1 - 0.05; // Base latitude from hash
     const lng = (hash % 360) - 180 + Math.random() * 0.1 - 0.05; // Base longitude from hash
