@@ -84,11 +84,15 @@ export default function Home() {
     }
   }, [authUser, isUserLoading, firestore, router]);
   
-  const handleLogout = (redirect = true) => {
+  const handleLogout = () => {
     signOut(auth).then(() => {
-      if (redirect) {
-        router.push('/login');
-      }
+      router.push('/login');
+    });
+  };
+
+  const handleChangeUser = () => {
+    signOut(auth).then(() => {
+      router.push('/login');
     });
   };
   
@@ -221,11 +225,11 @@ export default function Home() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => router.push('/login')} className="cursor-pointer">
+                <DropdownMenuItem onClick={handleChangeUser} className="cursor-pointer">
                   <UserIcon className="mr-2 h-4 w-4" />
                   <span>Cambiar Usuario</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleLogout(false)} className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive">
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Cerrar sesión</span>
                 </DropdownMenuItem>
