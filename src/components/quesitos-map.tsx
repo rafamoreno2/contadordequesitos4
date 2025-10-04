@@ -5,15 +5,12 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Quesito } from '@/types';
 
-// Fix for default icon not showing up in Next.js
-import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
-import iconUrl from 'leaflet/dist/images/marker-icon.png';
-import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
-
+// SOLUCIÓN DEFINITIVA: Usar URLs de un CDN público para los iconos.
+// Esto evita todos los problemas de empaquetado de Next.js.
 const defaultIcon = new L.Icon({
-    iconRetinaUrl: iconRetinaUrl.src,
-    iconUrl: iconUrl.src,
-    shadowUrl: shadowUrl.src,
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
     iconSize: [25, 41],
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
