@@ -20,8 +20,6 @@ const defaultIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-L.Marker.prototype.options.icon = defaultIcon;
-
 
 // Dummy "geocoding" - VERY basic, just to get some coordinates.
 // In a real app, you'd use a proper geocoding service.
@@ -91,7 +89,7 @@ export default function QuesitosMap({ quesitos }: QuesitosMapProps) {
                 <div class="text-xs text-muted-foreground">Añadido por: ${quesito.addedBy.username}</div>
             `;
 
-            const marker = L.marker(position).addTo(map).bindPopup(popupContent);
+            const marker = L.marker(position, { icon: defaultIcon }).addTo(map).bindPopup(popupContent);
             markersRef.current.push(marker); // Add new marker to ref
         }
     });
