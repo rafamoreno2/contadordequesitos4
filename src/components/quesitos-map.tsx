@@ -1,9 +1,9 @@
 'use client';
 
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import type { Quesito } from '@/types';
+import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import type { Quesito } from '@/types';
 
 // Fix for default icon not showing up in Next.js
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
@@ -22,9 +22,6 @@ const defaultIcon = new L.Icon({
 
 L.Marker.prototype.options.icon = defaultIcon;
 
-type QuesitosMapProps = {
-  quesitos: Quesito[];
-};
 
 // Dummy "geocoding" - VERY basic, just to get some coordinates.
 // In a real app, you'd use a proper geocoding service.
@@ -45,31 +42,61 @@ const geocodeLocation = (locationName: string): [number, number] | null => {
     return [lat, lng];
 }
 
+type QuesitosMapProps = {
+  quesitos: Quesito[];
+};
 
 export default function QuesitosMap({ quesitos }: QuesitosMapProps) {
-  const mapCenter: [number, number] = [40.416775, -3.703790]; // Centered on Spain
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markersRef = useRef<L.Marker[]>([]);
 
-  const validQuesitos = quesitos.map(q => ({
-      ...q,
-      position: geocodeLocation(q.location)
-  })).filter(q => q.position !== null) as (Quesito & { position: [number, number] })[];
+  // Effect for initializing the map ONCE
+  useEffect(() => {
+    if (mapContainerRef.current && !mapRef.current) { // Only initialize if ref is available and map is not initialized
+      const map = L.map(mapContainerRef.current).setView([40.416775, -3.703790], 6);
 
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      }).addTo(map);
 
-  return (
-    <MapContainer center={mapCenter} zoom={6} style={{ height: '400px', width: '100%', borderRadius: '0.5rem' }}>
-      <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      />
-      {validQuesitos.map((quesito) => (
-        <Marker key={quesito.id} position={quesito.position}>
-          <Popup>
-            <div className="font-semibold">{quesito.name}</div>
-            <div>Visto en: {quesito.location}</div>
-            <div className="text-xs text-muted-foreground">Añadido por: {quesito.addedBy.username}</div>
-          </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
-  );
+      mapRef.current = map;
+    }
+    
+    // Cleanup function to run when the component is unmounted
+    return () => {
+        if (mapRef.current) {
+            mapRef.current.remove();
+            mapRef.current = null;
+        }
+    };
+  }, []); // Empty dependency array ensures this runs only once.
+
+  // Effect for updating markers when quesitos data changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return; // Don't do anything if map is not ready
+
+    // 1. Clear existing markers from the map and the ref array
+    markersRef.current.forEach(marker => marker.remove());
+    markersRef.current = [];
+
+    // 2. Filter valid quesitos and add new markers
+    quesitos.forEach(quesito => {
+        const position = geocodeLocation(quesito.location);
+        if (position) {
+            const popupContent = `
+                <div class="font-semibold">${quesito.name}</div>
+                <div>Visto en: ${quesito.location}</div>
+                <div class="text-xs text-muted-foreground">Añadido por: ${quesito.addedBy.username}</div>
+            `;
+
+            const marker = L.marker(position).addTo(map).bindPopup(popupContent);
+            markersRef.current.push(marker); // Add new marker to ref
+        }
+    });
+
+  }, [quesitos]); // This effect re-runs ONLY when the quesitos array changes.
+
+  return <div ref={mapContainerRef} style={{ height: '400px', width: '100%', borderRadius: '0.5rem' }} />;
 }
