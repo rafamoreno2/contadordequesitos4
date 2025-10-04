@@ -44,6 +44,10 @@
           "type": "string",
           "description": "The Instagram username associated with this quesito."
         },
+        "location": {
+          "type": "string",
+          "description": "The location where the quesito was spotted."
+        },
         "createdAt": {
           "type": "string",
           "description": "Timestamp indicating when the quesito was added.",
@@ -54,6 +58,7 @@
         "id",
         "userId",
         "instagramUsername",
+        "location",
         "createdAt"
       ]
     }

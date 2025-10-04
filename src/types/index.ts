@@ -11,6 +11,7 @@ export type Quesito = {
   id:string;
   name: string;
   igUsername: string;
+  location: string;
   addedBy: {
     userId: string;
     username: string;

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import QuesitoForm from '@/components/quesito-form';
 import QuesitoList from '@/components/quesito-list';
 import ContributorsTable from '@/components/contributors-table';
@@ -29,6 +30,11 @@ import {
 } from '@/firebase';
 import { collection, doc, serverTimestamp, query, orderBy, writeBatch, onSnapshot } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
+
+const QuesitosMap = dynamic(() => import('@/components/quesitos-map'), {
+  ssr: false,
+  loading: () => <div className="h-96 w-full bg-muted rounded-lg flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
+});
 
 
 export default function Home() {
@@ -104,7 +110,7 @@ export default function Home() {
   }, [quesitosData]);
 
 
-  const handleAddQuesito = (name: string, igUsername: string) => {
+  const handleAddQuesito = (name: string, igUsername: string, location: string) => {
     if (!localUser || !localUser.username || !localUser.avatar) return;
 
     const quesitosColRef = collection(firestore, 'quesitos');
@@ -114,6 +120,7 @@ export default function Home() {
     addDocumentNonBlocking(quesitosColRef, {
       name,
       igUsername,
+      location,
       addedBy: {
         userId: localUser.id,
         username: localUser.username,
@@ -214,7 +221,7 @@ export default function Home() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => handleLogout(true)} className="cursor-pointer">
+                <DropdownMenuItem onClick={() => router.push('/login')} className="cursor-pointer">
                   <UserIcon className="mr-2 h-4 w-4" />
                   <span>Cambiar Usuario</span>
                 </DropdownMenuItem>
@@ -240,6 +247,7 @@ export default function Home() {
           </div>
           <div className="space-y-8">
              <ContributorsTable contributors={contributors} />
+             <QuesitosMap quesitos={quesitosData || []} />
           </div>
         </div>
       </main>
